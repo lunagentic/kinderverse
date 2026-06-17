@@ -50,8 +50,25 @@ function cardToContent(item) {
   if (item.type === "image") return { title: d.alt || "이미지", content: d.alt || "" };
   if (item.type === "design")
     return { title: d.title || "디자인", content: [d.subtitle, ...(d.points || [])].filter(Boolean).join("\n") };
-  if (item.type === "plan")
-    return { title: d.title || "계획", content: valueToText(d.payload) };
+  if (item.type === "designdoc") {
+    const texts = (d.elements || []).filter((e) => e.type === "text").map((e) => e.text);
+    return { title: d.title || texts[0] || "디자인", content: texts.join("\n") };
+  }
+  if (item.type === "plan") {
+    const p = d.payload || {};
+    // 놀이아이디어는 깔끔한 문장으로 추출
+    if (Array.isArray(p.ideas) && p.ideas[0]) {
+      const idea = p.ideas[0];
+      const lines = [
+        idea.intro,
+        (idea.materials || []).length ? `놀이재료: ${idea.materials.join(", ")}` : "",
+        ...(idea.method || []),
+        ...(idea.tips || []),
+      ].filter(Boolean);
+      return { title: idea.title || d.title || "놀이", content: lines.join("\n") };
+    }
+    return { title: d.title || "계획", content: valueToText(p) };
+  }
   return { title: d.title || "카드", content: "" };
 }
 

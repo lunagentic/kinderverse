@@ -263,24 +263,66 @@ export async function convertItem({ format, title, content }) {
     };
   }
 
-  // design: 편집 가능한 디자인 템플릿
+  // design: element 기반 DesignDoc (텍스트·이미지·도형이 개별 편집 단위로 분리)
   const lines = text.split("\n").map((s) => s.trim()).filter(Boolean);
-  const palette = DESIGN_PALETTES[hashStr(t) % DESIGN_PALETTES.length];
+  const doc = buildDesignDoc(t, lines);
+  const ratio = doc.frame.h / doc.frame.w;
   return {
     items: [
       {
-        type: "design",
-        data: {
-          title: t,
-          subtitle: lines[0] || "부제목을 입력하세요",
-          points: lines.slice(1, 7).length ? lines.slice(1, 7) : ["내용을 입력하세요"],
-          accent: palette.accent,
-          bg: palette.bg,
-        },
-        size: { w: 360, h: 420 },
+        type: "designdoc",
+        data: doc,
+        size: { w: 320, h: Math.round(320 * ratio) },
       },
     ],
-    reply: `"${t}" 편집 가능한 디자인 템플릿으로 만들었어요. 텍스트·색상을 클릭해 편집하세요.`,
+    reply: `"${t}" 편집 가능한 디자인으로 만들었어요. 텍스트·이미지·도형이 각각 분리되어 있어요(편집 기능은 다음 단계).`,
+  };
+}
+
+// 콘텐츠 → DesignDoc (포스터 템플릿: 헤더/대표이미지/항목 카드)
+function buildDesignDoc(title, lines) {
+  const W = 960;
+  const palette = DESIGN_PALETTES[hashStr(title) % DESIGN_PALETTES.length];
+  const subtitle = lines[0] || "";
+  const items = lines.slice(1, 6); // 항목 카드 최대 5개
+  const startY = 600;
+  const rowH = 130;
+  const H = startY + items.length * rowH + 40;
+
+  const els = [
+    // 헤더 배경 + 제목
+    { id: "hdr", type: "shape", x: 40, y: 40, w: W - 80, h: 150,
+      style: { bg: palette.bg, radius: 24 } },
+    { id: "title", type: "text", x: 70, y: 70, w: W - 140, h: 92,
+      text: title,
+      style: { fontSize: 52, weight: 800, color: palette.accent, align: "center" } },
+    // 대표 이미지 슬롯(AI 생성용) + 부제
+    { id: "hero", type: "image", x: 40, y: 210, w: W - 80, h: 300,
+      src: null, prompt: `${title} 대표 일러스트, 수채화풍`, fit: "cover" },
+    { id: "sub", type: "text", x: 70, y: 525, w: W - 140, h: 56,
+      text: subtitle || "부제목을 입력하세요",
+      style: { fontSize: 24, weight: 600, color: "#5c5249", align: "center" } },
+  ];
+
+  // 항목 카드(도형 + 번호 + 텍스트)
+  items.forEach((line, i) => {
+    const y = startY + i * rowH;
+    els.push(
+      { id: `card${i}`, type: "shape", x: 40, y, w: W - 80, h: rowH - 20,
+        style: { bg: "#ffffff", radius: 16 } },
+      { id: `num${i}`, type: "shape", x: 64, y: y + 24, w: 56, h: 56,
+        style: { bg: palette.accent, radius: 28 } },
+      { id: `txt${i}`, type: "text", x: 140, y: y + 18, w: W - 200, h: rowH - 50,
+        text: line,
+        style: { fontSize: 22, weight: 500, color: "#3f3833", align: "left" } }
+    );
+  });
+
+  return {
+    output_type: "DesignDoc",
+    title,
+    frame: { w: W, h: H, bg: "#fbf7f0" },
+    elements: els,
   };
 }
 

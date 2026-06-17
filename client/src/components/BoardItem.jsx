@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { X, FileText, Image as ImageIcon, Palette } from "lucide-react";
 import PlanView from "./PlanView.jsx";
 
@@ -138,6 +138,10 @@ function NodeContent({ item, editing, setEditing, onUpdateData }) {
     );
   }
 
+  if (type === "designdoc") {
+    return <DesignFrame data={data} />;
+  }
+
   if (type === "design") {
     return (
       <DesignCard
@@ -226,7 +230,97 @@ function NodeContent({ item, editing, setEditing, onUpdateData }) {
   );
 }
 
-// ── 편집 가능한 디자인 템플릿 ──
+// ── DesignDoc: element 기반 디자인 (Phase 1: 읽기전용 렌더) ──
+function DesignFrame({ data }) {
+  const { frame, elements = [] } = data;
+  const wrapRef = useRef(null);
+  const [scale, setScale] = useState(0.33);
+
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / frame.w);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [frame.w]);
+
+  return (
+    <div className="dframe-wrap" ref={wrapRef}>
+      <div
+        className="dframe"
+        style={{
+          width: frame.w,
+          height: frame.h,
+          background: frame.bg,
+          transform: `scale(${scale})`,
+        }}
+      >
+        {elements.map((el) => (
+          <DesignEl key={el.id} el={el} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DesignEl({ el }) {
+  const base = {
+    position: "absolute",
+    left: el.x,
+    top: el.y,
+    width: el.w,
+    height: el.h,
+  };
+  const s = el.style || {};
+
+  if (el.type === "shape") {
+    return <div style={{ ...base, background: s.bg, borderRadius: s.radius || 0 }} />;
+  }
+  if (el.type === "text") {
+    const justify =
+      s.align === "center" ? "center" : s.align === "right" ? "flex-end" : "flex-start";
+    return (
+      <div
+        style={{
+          ...base,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: justify,
+          textAlign: s.align || "left",
+          fontSize: s.fontSize,
+          fontWeight: s.weight,
+          color: s.color,
+          lineHeight: 1.3,
+          overflow: "hidden",
+        }}
+      >
+        {el.text}
+      </div>
+    );
+  }
+  if (el.type === "image" || el.type === "photo") {
+    if (el.src) {
+      return (
+        <img
+          src={el.src}
+          alt=""
+          draggable={false}
+          style={{ ...base, objectFit: el.fit || "cover", borderRadius: 12 }}
+        />
+      );
+    }
+    return (
+      <div className="dframe-imgph" style={{ ...base }}>
+        {el.type === "photo" ? "사진 자리" : "이미지 자리"}
+      </div>
+    );
+  }
+  return null;
+}
+
+// ── 편집 가능한 디자인 템플릿 (구버전 단순 카드) ──
 const DESIGN_COLORS = ["#d97757", "#c2613f", "#cf8a3b", "#b86b4b", "#7c8a4b", "#4b7c8a"];
 
 function DesignCard({ item, data, editing, setEditing, onUpdateData, stop }) {

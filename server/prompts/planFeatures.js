@@ -1,0 +1,621 @@
+// PROMPTS.md §3 agent.plan — L2 태스크 정의 (7개 feature)
+// 각 feature: role / rules / input_schema / output_schema(문서의 출력 JSON 스키마)
+
+// 예시는 출력 JSON 스키마와 동일한 형태로 제공한다(예시=출력값 형식 일치). 상세도·표현 참고용이며 동일 놀이 반복 금지.
+export const PLAY_IDEA_EXAMPLES = `[출력 예시 — 아래 JSON 스키마와 동일한 형식. 상세도/표현 참고용, 동일·유사 놀이 반복 금지]
+{
+  "output_type": "PlayIdeaList",
+  "feature_id": "play_idea",
+  "ideas": [
+    {
+      "title": "달팽이가 지나간 길",
+      "idea_type": "창의",
+      "learning_area": ["예술경험", "자연탐구"],
+      "materials": ["큰 전지 또는 비닐", "물감", "스폰지", "투명 젤"],
+      "intro": "달팽이가 지나간 길을 상상하며 다양한 선과 무늬를 표현해 보세요.",
+      "method": [
+        "큰 전지나 비닐을 바닥에 고정하고, 물감과 스폰지로 소용돌이와 구불구불한 길을 자유롭게 그려보게 하세요.",
+        "친구들의 길과 비교하며 관찰하세요."
+      ],
+      "tips": [
+        "\\"달팽이가 지나간 길은 어떤 모양일까요?\\" \\"달팽이는 어디로 가고 있을까요?\\"",
+        "투명 젤을 활용해 감각 놀이로 확장할 수 있어요."
+      ]
+    },
+    {
+      "title": "팝콘 매점 운영하기",
+      "idea_type": "놀이",
+      "learning_area": ["예술경험", "사회관계"],
+      "materials": ["노란 습자지", "종이봉투 또는 종이컵", "가격표", "종이 돈 또는 카드"],
+      "intro": "영화관 매점에서 판매할 팝콘을 만들고 손님과 점원이 되어 놀이하세요.",
+      "method": [
+        "노란 습자지를 구겨 팝콘을 만들고, 종이봉투나 종이컵에 담으세요.",
+        "가격표를 붙여 판매대를 꾸미고, 손님과 점원이 되어 판매 놀이를 해요."
+      ],
+      "tips": [
+        "\\"어떤 맛의 팝콘을 만들고 싶나요?\\"",
+        "종이 돈이나 카드를 활용해 계산 놀이로 확장할 수 있어요.",
+        "실제 영화관 사진을 제공해 관찰하며 몰입도를 높여 주세요."
+      ]
+    }
+  ]
+}`;
+
+export const PLAN_FEATURES = {
+  // ── 3.1 놀이아이디어 ──
+  play_idea: {
+    feature_id: "play_idea",
+    agent: "agent.plan",
+    output_type: "PlayIdeaList",
+    label: "놀이아이디어",
+    role: `교사가 입력한 주제·생활주제·계절·프로젝트 키워드를 바탕으로, 유아의 흥미를 유발하고 발달에 적합하며 재미있는 놀이아이디어를 생성한다. 아래 Good Example 의 상세도·표현 방식을 참고한다. 단순 활동 나열이 아니라 '놀이 아이디어(자유로운 놀이)·탐구 아이디어(관찰·실험·발견)·창의 아이디어(상상·표현·변형)' 세 결을 중심으로 구성한다. 생성 결과는 미션카드·월안·주안·일안·프로젝트계획·환경구성안·안내문의 기반 데이터로 쓰인다.`,
+    rules: [
+      "각 아이디어에 idea_type 을 '놀이|탐구|창의' 중 하나로 지정하고, 세 유형이 고르게 포함되도록 한다.",
+      "놀이재료(materials)는 구체적으로 명시한다. 예: '큰 전지', '물감과 스폰지', '투명 젤' 처럼 교사가 바로 준비할 수 있는 수준으로 적는다(추상적 표현 금지).",
+      "놀이는 유아의 흥미를 끌고 자발적 참여를 유도하는 재미있는 경험 중심으로 구성한다.",
+      "연령(age_band)에 발달적으로 적합해야 한다. 지식 전달·정답 찾기 중심 활동은 금지한다.",
+      "놀이명은 짧고 구체적으로 작성한다.",
+      "놀이 소개는 놀이 경험 중심으로 작성한다.",
+      "놀이 방법은 2~4단계로 작성한다.",
+      "놀이팁은 질문·환경구성·관찰포인트·안전사항을 포함할 수 있다.",
+      "Good Example 을 참고하되 동일하거나 유사한 놀이를 반복 생성하지 않는다. 놀이 유형도 다양하게 한다.",
+      "quantity 개수만큼 생성한다.",
+    ],
+    input_schema: {
+      age_band: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      project_mode: false,
+      quantity: 5,
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "PlayIdeaList",
+      feature_id: "play_idea",
+      ideas: [
+        {
+          title: "",
+          idea_type: "놀이|탐구|창의",
+          learning_area: [""],
+          materials: [""],
+          intro: "",
+          method: ["", ""],
+          tips: [""],
+        },
+      ],
+    },
+    extra: PLAY_IDEA_EXAMPLES,
+  },
+
+  // ── 3.2 놀이미션카드 ──
+  mission_card: {
+    feature_id: "mission_card",
+    agent: "agent.plan",
+    output_type: "MissionCardData",
+    label: "놀이미션카드",
+    role: `놀이아이디어를 카드 형태로 변환하기 위한 데이터를 생성한다. 카드 한 장당 놀이 1개. 유아의 흥미를 불러일으키는 행동을 미션 형태로 요약한다.`,
+    rules: [
+      "카드 한 장당 놀이 1개.",
+      "유아 친화적인 표현을 사용한다.",
+      "놀이 방법 전체를 넣지 않는다.",
+      "유아의 흥미를 불러일으키기 위한 행동을 미션 형태로 요약한다.",
+      "교사가 한눈에 이해 가능해야 한다.",
+      "상단(연령·대주제·소주제) / 중앙(놀이명·대표 미션 문구·대표 일러스트 설명) / 하단(놀이 미션·놀이 팁·배움 영역) 구성을 따른다.",
+    ],
+    input_schema: { age: "", theme: "", sub_theme: "", play_idea: {} },
+    output_schema: {
+      output_type: "MissionCardData",
+      age: "",
+      theme: "",
+      sub_theme: "",
+      play_name: "",
+      mission_title: "",
+      mission_text: [""],
+      learning_tip: "",
+      learning_area: [""],
+      image_prompt: "",
+    },
+  },
+
+  // ── 3.3 월간 놀이계획 ──
+  monthly_plan: {
+    feature_id: "monthly_plan",
+    agent: "agent.plan",
+    output_type: "MonthlyPlan",
+    label: "월간 놀이계획",
+    role: `교사가 입력한 연령·놀이주제·생활주제·계절·기간·놀이아이디어를 바탕으로 한 달 놀이 흐름을 설계한다. 주차별 소주제와 놀이 흐름이 드러나야 하며, 주안·일안의 상위 컨텍스트로 사용된다.`,
+    rules: [
+      "월안은 한 달의 성장 흐름이 보이도록 작성한다.",
+      "4~5주 구성으로 생성한다.",
+      "각 주차는 소주제 1개와 놀이 4~6개를 포함한다.",
+      "주차 흐름은 `관심 갖기 → 탐색하기 → 표현하기 → 확장하기 → 공유하기` 순서로 설계한다.",
+      "놀이 선정 이유에는 유아의 흥미, 계절 및 생활주제, 발달적 가치를 모두 포함한다.",
+      "바깥놀이 및 신체활동은 주차별로 작성한다.",
+      "안전교육·인성교육·행사·가정연계활동을 생략하지 않는다. 행사가 없으면 \"-\"로 출력한다.",
+      "모든 출력은 JSON만 반환한다.",
+    ],
+    input_schema: {
+      feature_id: "monthly_plan",
+      age_band: "",
+      class_name: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      month: "",
+      period: { start_date: "", end_date: "" },
+      week_count: 5,
+      play_ideas: [],
+      events: [],
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "MonthlyPlan",
+      plan_type: "monthly_plan",
+      basic_info: {
+        age_band: "",
+        class_name: "",
+        theme: "",
+        life_theme: "",
+        season: "",
+        period: { start_date: "", end_date: "", label: "" },
+      },
+      rationale: {
+        summary: "",
+        children_interest: { recent_interest: "", play_experience: "" },
+        season_and_environment: {
+          seasonal_feature: "",
+          natural_environment: "",
+          institution_event: "",
+        },
+        developmental_value: {
+          cognitive: "",
+          social: "",
+          physical: "",
+          language: "",
+          artistic: "",
+        },
+      },
+      teacher_expectations: [{ goal: "", focus: "탐색|표현|협력|문제해결|의사소통" }],
+      curriculum_links: [
+        {
+          area: "신체운동·건강|의사소통|사회관계|예술경험|자연탐구",
+          content: "",
+          expected_experience: "",
+        },
+      ],
+      weekly_flow: [
+        {
+          week: 1,
+          flow_stage: "관심 갖기",
+          sub_theme: "",
+          play_ideas: [{ title: "", learning_area: [""], core_experience: "" }],
+        },
+        { week: 2, flow_stage: "탐색하기", sub_theme: "", play_ideas: [] },
+        { week: 3, flow_stage: "표현하기", sub_theme: "", play_ideas: [] },
+        { week: 4, flow_stage: "확장하기", sub_theme: "", play_ideas: [] },
+        { week: 5, flow_stage: "공유하기", sub_theme: "", play_ideas: [] },
+      ],
+      outdoor_and_physical_play: [
+        { week: 1, activity_name: "", method: "", expected_experience: "" },
+      ],
+      safety_education: { play_safety: "", tool_safety: "", life_safety: "" },
+      character_education: { core_value: "배려|존중|협력|책임", practice_context: "" },
+      events: [{ name: "", date: "", connection: "" }],
+      home_connection: {
+        home_play: "",
+        parent_question: "",
+        recommended_picture_book: "",
+      },
+    },
+  },
+
+  // ── 3.4 주간 놀이계획 ──
+  weekly_plan: {
+    feature_id: "weekly_plan",
+    agent: "agent.plan",
+    output_type: "WeeklyPlan",
+    label: "주간 놀이계획",
+    role: `월안의 특정 주차를 바탕으로 월~금 운영 가능한 주간 놀이계획안을 작성한다. 요일별 놀이 흐름이 드러나야 하며, 일안의 상위 컨텍스트로 사용된다.`,
+    rules: [
+      "주안은 한 주의 운영 흐름이 보이도록 작성한다.",
+      "월~금 5일 구조로 생성한다.",
+      "각 요일은 놀이 3~5개를 포함한다.",
+      "요일 흐름은 `관심 및 탐색 → 탐구 및 경험 → 표현 → 협력 → 공유 및 확장` 순서로 설계한다.",
+      "월안에서 선택된 주차의 소주제와 놀이 흐름을 상속한다.",
+      "바깥놀이 및 신체활동은 요일별로 작성한다.",
+      "안전교육·인성교육·행사·가정연계활동을 생략하지 않는다. 행사가 없으면 \"-\"로 출력한다.",
+      "모든 출력은 JSON만 반환한다.",
+    ],
+    input_schema: {
+      feature_id: "weekly_plan",
+      age_band: "",
+      theme: "",
+      sub_theme: "",
+      week_number: 1,
+      period: { start_date: "", end_date: "" },
+      monthly_context: {},
+      selected_week_from_monthly_plan: {},
+      play_ideas: [],
+      events: [],
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "WeeklyPlan",
+      plan_type: "weekly_plan",
+      basic_info: {
+        age_band: "",
+        theme: "",
+        sub_theme: "",
+        week_number: 1,
+        period: { start_date: "", end_date: "", label: "" },
+      },
+      rationale: {
+        summary: "",
+        meaning_of_this_week: "",
+        connection_from_previous_play: "",
+        expansion_to_next_play: "",
+      },
+      teacher_expectations: [{ goal: "", focus: "탐색|표현|협력|문제해결|의사소통" }],
+      curriculum_links: [
+        {
+          area: "신체운동·건강|의사소통|사회관계|예술경험|자연탐구",
+          content: "",
+          expected_experience: "",
+        },
+      ],
+      daily_flow: [
+        {
+          day: "월",
+          date: "",
+          flow_stage: "관심 및 탐색",
+          play_ideas: [{ title: "", core_experience: "", learning_area: [""] }],
+        },
+        { day: "화", date: "", flow_stage: "탐구 및 경험", play_ideas: [] },
+        { day: "수", date: "", flow_stage: "표현", play_ideas: [] },
+        { day: "목", date: "", flow_stage: "협력", play_ideas: [] },
+        { day: "금", date: "", flow_stage: "공유 및 확장", play_ideas: [] },
+      ],
+      outdoor_and_physical_play: [
+        { day: "월", activity_name: "", method: "", safety_point: "" },
+      ],
+      safety_education: { weekly_safety_focus: "", teacher_guidance: "" },
+      character_education: { core_value: "", practice_context: "" },
+      events: [{ name: "", date: "", connection: "" }],
+      home_connection: { home_play: "", conversation_topic: "", observation_point: "" },
+    },
+  },
+
+  // ── 3.5 일일 놀이계획 ──
+  daily_plan: {
+    feature_id: "daily_plan",
+    agent: "agent.plan",
+    output_type: "DailyPlan",
+    label: "일일 놀이계획",
+    role: `주안의 특정 요일 놀이를 바탕으로 교사가 바로 운영할 수 있는 일일 놀이계획안을 작성한다. 도입·전개·마무리·평가·확장까지 포함한 실행 단위 계획이어야 한다.`,
+    rules: [
+      "일안은 교사가 바로 수업할 수 있는 수준으로 상세 작성한다.",
+      "도입 → 전개 → 마무리 구조를 반드시 포함한다.",
+      "전개활동은 2~4개 생성한다.",
+      "각 전개활동은 놀이명·놀이목표·놀이방법·교사 발문·예상 유아 반응·지원 전략을 포함한다.",
+      "준비물은 교사 준비물과 유아 사용 자료로 구분한다.",
+      "환경구성은 실내환경과 실외환경으로 구분한다.",
+      "바깥놀이·우천시 대체활동·안전 및 유의사항·평가·확장활동·가정연계를 생략하지 않는다.",
+      "모든 출력은 JSON만 반환한다.",
+    ],
+    input_schema: {
+      feature_id: "daily_plan",
+      age_band: "",
+      theme: "",
+      sub_theme: "",
+      date: "",
+      day: "",
+      weekly_context: {},
+      selected_day_from_weekly_plan: {},
+      selected_play_ideas: [],
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "DailyPlan",
+      plan_type: "daily_plan",
+      basic_info: { age_band: "", theme: "", sub_theme: "", date: "", day: "" },
+      teacher_expectations: [{ goal: "", focus: "탐색|표현|협력|문제해결|의사소통" }],
+      curriculum_links: [
+        {
+          area: "신체운동·건강|의사소통|사회관계|예술경험|자연탐구",
+          content: "",
+          expected_experience: "",
+        },
+      ],
+      materials: { teacher_materials: [""], children_materials: [""] },
+      environment_setup: {
+        indoor_environment: { space_setup: "", material_arrangement: "" },
+        outdoor_environment: { play_environment: "" },
+      },
+      introduction: {
+        interest_trigger: "",
+        conversation: {
+          teacher_questions: ["", "", ""],
+          expected_child_responses: [""],
+        },
+      },
+      development_activities: [
+        {
+          activity_name: "",
+          activity_goal: "",
+          activity_method: ["1단계", "2단계", "3단계"],
+          teacher_questions: ["", "", ""],
+          expected_child_responses: [""],
+          support_strategy: {
+            language_support: "",
+            play_expansion: "",
+            individual_support: "",
+          },
+        },
+      ],
+      closing: {
+        experience_sharing: "",
+        reflection_questions: [""],
+        connection_to_next_play: "",
+      },
+      outdoor_and_physical_play: { activity_name: "", method: "", safety_guidance: "" },
+      rainy_day_alternative: {
+        indoor_alternative_play: "",
+        materials: [""],
+        operation_method: "",
+      },
+      safety_notes: { play_safety: "", environment_safety: "", health_safety: "" },
+      assessment: {
+        observation_points: ["", "", ""],
+        teacher_check_questions: ["", "", ""],
+      },
+      extension_activities: {
+        classroom_extension: "",
+        project_extension: "",
+        art_extension: "",
+        role_play_extension: "",
+      },
+      home_connection: {
+        try_at_home: "",
+        parent_question: "",
+        recommended_picture_book: "",
+        follow_up_play: "",
+      },
+    },
+  },
+
+  // ── 3.6 프로젝트 놀이계획안 ──
+  project_plan: {
+    feature_id: "project_plan",
+    agent: "agent.plan",
+    output_type: "ProjectPlan",
+    label: "프로젝트 계획안",
+    role: `교사가 입력한 주제·연령·생활주제·계절·기간·놀이아이디어를 바탕으로 장기간 탐구 가능한 프로젝트 놀이계획안을 작성한다. 유아의 질문과 흥미에서 출발하여 탐구·표현·확장·공유 흐름이 드러나야 하며, 안내문·주안·일안·놀이기록의 상위 컨텍스트로 사용된다.`,
+    rules: [
+      "프로젝트는 유아의 질문과 흥미에서 시작한다.",
+      "프로젝트 흐름은 `시작하기 → 탐구하기 → 표현하기 → 확장하기 → 공유하기` 순서로 설계한다.",
+      "주제선정이유에는 유아의 관심, 환경적 요인, 교육적 가치를 모두 포함한다.",
+      "프로젝트 목표는 교육과정 5개 영역을 기준으로 작성한다.",
+      "주차별 운영계획은 4~5주 구성으로 작성한다.",
+      "가정연계·부모참여·지역사회연계·전시회·포트폴리오·결과물을 생략하지 않는다.",
+      "안전 및 유의사항은 연령별 안전교육 기준을 반영한다.",
+      "평가 체크리스트는 연령별 교육과정 영역에 맞게 작성한다.",
+      "모든 출력은 JSON만 반환한다.",
+    ],
+    input_schema: {
+      feature_id: "project_plan",
+      age_band: "",
+      class_name: "",
+      project_title: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      period: { start_date: "", end_date: "" },
+      project_type: "자연탐구|사회탐구|환경|지역사회|문화예술|진로|계절|기타",
+      play_ideas: [],
+      monthly_context: {},
+      events: [],
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "ProjectPlan",
+      plan_type: "project_plan",
+      basic_info: {
+        age_band: "",
+        class_name: "",
+        project_title: "",
+        theme: "",
+        life_theme: "",
+        season: "",
+        project_type: "자연탐구|사회탐구|환경|지역사회|문화예술|진로|계절|기타",
+        period: { start_date: "", end_date: "", label: "" },
+      },
+      rationale: {
+        summary: "",
+        children_interest: {
+          children_questions: [""],
+          observed_interest: "",
+          related_play_experience: "",
+        },
+        environmental_factors: {
+          seasonal_feature: "",
+          local_environment: "",
+          institution_event: "",
+        },
+        educational_value: {
+          exploration: "",
+          communication: "",
+          cooperation: "",
+          expression: "",
+          problem_solving: "",
+        },
+      },
+      project_goals: [{ goal: "", focus: "탐구|의사소통|협력|표현|문제해결" }],
+      curriculum_links: [
+        {
+          area: "신체운동·건강|의사소통|사회관계|예술경험|자연탐구",
+          content: "",
+          expected_experience: "",
+        },
+      ],
+      project_flow: [
+        {
+          stage: "시작하기",
+          purpose: "관심과 호기심 형성",
+          key_questions: [""],
+          main_activities: [
+            {
+              title: "",
+              description: "",
+              teacher_support: "",
+              open_questions: [{ question: "", purpose: "" }],
+            },
+          ],
+        },
+        { stage: "탐구하기", purpose: "관찰·조사·실험·자료 수집", key_questions: [""], main_activities: [] },
+        { stage: "표현하기", purpose: "탐구 경험을 다양한 방식으로 표현", key_questions: [""], main_activities: [] },
+        { stage: "확장하기", purpose: "새로운 질문과 심화 놀이로 확장", key_questions: [""], main_activities: [] },
+        { stage: "공유하기", purpose: "배움과 경험을 함께 나누기", key_questions: [""], main_activities: [] },
+      ],
+      weekly_operation_plan: [
+        { week: 1, stage: "시작하기", sub_theme: "", main_activities: [""], teacher_support: "", expected_experience: "" },
+        { week: 2, stage: "탐구하기", sub_theme: "", main_activities: [], teacher_support: "", expected_experience: "" },
+        { week: 3, stage: "표현하기", sub_theme: "", main_activities: [], teacher_support: "", expected_experience: "" },
+        { week: 4, stage: "확장하기", sub_theme: "", main_activities: [], teacher_support: "", expected_experience: "" },
+        { week: 5, stage: "공유하기", sub_theme: "", main_activities: [], teacher_support: "", expected_experience: "" },
+      ],
+      home_connection: {
+        home_exploration: "",
+        parent_conversation_questions: [""],
+        materials_request: [""],
+        recommended_picture_books: [""],
+        weekend_activity: "",
+      },
+      parent_participation: [
+        { activity_name: "", description: "", participation_method: "" },
+      ],
+      community_connection: [
+        { place_or_person: "", activity: "", connection_purpose: "" },
+      ],
+      project_exhibition: {
+        exhibition_title: "",
+        display_areas: [
+          { area_name: "관찰 영역|탐구 영역|예술 영역|미디어 영역|체험 영역", display_content: "" },
+        ],
+        parent_invitation_plan: "",
+      },
+      portfolio: {
+        components: ["프로젝트 시작", "질문 모음", "관찰 기록", "탐구 활동", "표현 활동", "놀이 속 배움", "프로젝트 마무리"],
+        documentation_method: "",
+      },
+      project_outputs: {
+        children_outputs: [""],
+        teacher_outputs: [""],
+        parent_shared_materials: [""],
+        exhibition_materials: [""],
+      },
+      safety_notes: {
+        risk_factors: [""],
+        prevention_methods: [""],
+        teacher_support: [""],
+        related_safety_domains: [""],
+      },
+      assessment: {
+        physical_health: [""],
+        communication: [""],
+        social_relationships: [""],
+        arts_experience: [""],
+        nature_exploration: [""],
+        emotional_development: [""],
+        cognitive_development: [""],
+      },
+    },
+  },
+
+  // ── 3.7 프로젝트 안내문 ──
+  project_notice: {
+    feature_id: "project_notice",
+    agent: "agent.plan",
+    output_type: "ProjectNotice",
+    label: "프로젝트 안내문",
+    role: `프로젝트 놀이계획안을 바탕으로 학부모에게 전달할 프로젝트 안내문을 작성한다. 교사용 운영 문서가 아니라 학부모 소통 문서이므로, 프로젝트의 의미·진행 흐름·가정 연계 내용을 쉽고 따뜻하게 전달한다.`,
+    rules: [
+      "대상은 학부모이다.",
+      "학부모가 1분 안에 이해할 수 있도록 간결하고 따뜻하게 작성한다.",
+      "교육 전문용어는 최소화하고, 필요한 경우 쉬운 말로 풀어 쓴다.",
+      "프로젝트 소개에는 주제선정이유와 아이들이 경험할 놀이를 자연스럽게 포함한다.",
+      "프로젝트 목표는 학부모가 이해하기 쉬운 문장으로 작성한다.",
+      "주차별 진행 흐름은 표 형태로 요약 가능한 데이터로 작성한다.",
+      "가정연계 활동과 준비물 안내를 반드시 포함한다.",
+      "담임교사 메시지는 협조 요청과 감사 인사를 포함한다.",
+      "모든 출력은 JSON만 반환한다.",
+    ],
+    input_schema: {
+      feature_id: "project_notice",
+      age_band: "",
+      class_name: "",
+      project_title: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      period: { start_date: "", end_date: "" },
+      project_plan_context: {},
+      weekly_operation_plan: [],
+      home_connection: {},
+      parent_participation: [],
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "ProjectNotice",
+      notice_type: "project_notice",
+      audience: "parents",
+      basic_info: {
+        age_band: "",
+        class_name: "",
+        project_title: "",
+        theme: "",
+        life_theme: "",
+        season: "",
+        period: { start_date: "", end_date: "", label: "" },
+      },
+      header: { title: "", subtitle: "", representative_image_prompt: "" },
+      greeting: { opening_message: "", project_intro: "", project_meaning: "" },
+      project_goals_for_parents: [
+        { area: "탐구|협력|표현|의사소통|문제해결|정서", goal: "" },
+      ],
+      project_period: { start_date: "", end_date: "", display_text: "" },
+      weekly_flow_summary: [
+        { week: 1, sub_theme: "", main_play: [""], parent_friendly_description: "" },
+        { week: 2, sub_theme: "", main_play: [], parent_friendly_description: "" },
+        { week: 3, sub_theme: "", main_play: [], parent_friendly_description: "" },
+        { week: 4, sub_theme: "", main_play: [], parent_friendly_description: "" },
+        { week: 5, sub_theme: "", main_play: [], parent_friendly_description: "" },
+      ],
+      home_connection: {
+        conversation_questions: [""],
+        home_activities: [""],
+        observation_points: [""],
+      },
+      materials_request: {
+        picture_books: [""],
+        photos: [""],
+        natural_materials: [""],
+        experience_materials: [""],
+        etc: [""],
+      },
+      expected_learning: [
+        { domain: "탐구|협력|표현|의사소통|문제해결|정서", experience: "" },
+      ],
+      parent_participation: [
+        { activity_name: "", how_to_participate: "", note: "" },
+      ],
+      teacher_message: { closing_message: "", request_for_support: "", thanks: "" },
+    },
+  },
+};

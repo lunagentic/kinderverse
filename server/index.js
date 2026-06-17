@@ -1,0 +1,63 @@
+import express from "express";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// .env 자동 로드 (루트 또는 server/) — generate.js import 보다 먼저 실행되어야 함
+for (const envPath of [join(__dirname, "..", ".env"), join(__dirname, ".env")]) {
+  if (existsSync(envPath)) {
+    try {
+      process.loadEnvFile(envPath);
+      console.log(`[verse] .env 로드: ${envPath}`);
+    } catch (err) {
+      console.warn(`[verse] .env 로드 실패(${envPath}):`, err.message);
+    }
+  }
+}
+
+const { generateItem } = await import("./generate.js");
+const { activeProvider } = await import("./prompts/index.js");
+const app = express();
+// 프로덕션(호스팅)은 PORT 를 주입받아 사용.
+// 개발 프리뷰에서는 클라이언트(vite)가 PORT 를 쓰므로 서버는 API_PORT 로 분리(충돌 방지).
+const isProd = process.env.NODE_ENV === "production";
+const PORT = process.env.API_PORT || (isProd ? process.env.PORT : undefined) || 3001;
+
+app.use(express.json());
+
+// --- API ---
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, service: "verse", time: new Date().toISOString() });
+});
+
+// 채팅 프롬프트 → 보드 아이템 생성
+app.post("/api/generate", async (req, res) => {
+  const prompt = (req.body?.prompt || "").trim();
+  if (!prompt) {
+    return res.status(400).json({ error: "prompt 가 비어있습니다." });
+  }
+  try {
+    const item = await generateItem(prompt);
+    res.json(item);
+  } catch (err) {
+    console.error("[verse] generate error:", err);
+    res.status(500).json({ error: "생성 중 오류가 발생했습니다." });
+  }
+});
+
+// --- 프로덕션: 빌드된 프론트엔드 서빙 ---
+const clientDist = join(__dirname, "..", "client", "dist");
+if (existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get("*", (req, res) => res.sendFile(join(clientDist, "index.html")));
+}
+
+app.listen(PORT, () => {
+  const provider = activeProvider();
+  console.log(`[verse] API listening on http://localhost:${PORT}`);
+  console.log(
+    `[verse] LLM provider: ${provider || "없음 (목업 모드 — .env 에 OPENAI_API_KEY 설정)"}`
+  );
+});

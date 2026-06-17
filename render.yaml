@@ -1,0 +1,22 @@
+# Render Blueprint — KinderVerse 배포 설정
+# https://render.com 에서 New + → Blueprint → 이 저장소 선택 시 자동 적용됩니다.
+services:
+  - type: web
+    name: kinderverse
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # OpenAI(GPT) 키 — Render 대시보드에서 직접 입력(보안상 코드에 두지 않음)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+      - key: OPENAI_IMAGE_MODEL
+        value: gpt-image-2
+      - key: OPENAI_IMAGE_QUALITY
+        value: high

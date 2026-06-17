@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, FileText, Image as ImageIcon, Palette } from "lucide-react";
 import PlanView from "./PlanView.jsx";
 
 export default function BoardItem({
@@ -10,6 +10,7 @@ export default function BoardItem({
   onUpdate,
   onUpdateData,
   onRemove,
+  onConvert,
 }) {
   const [editing, setEditing] = useState(false);
   const drag = useRef(null);
@@ -92,6 +93,20 @@ export default function BoardItem({
         </button>
       )}
 
+      {selected && onConvert && (
+        <div className="node-actions" onPointerDown={(e) => e.stopPropagation()}>
+          <button onClick={() => onConvert(item, "document")} title="문서로 만들기">
+            <FileText size={13} />
+          </button>
+          <button onClick={() => onConvert(item, "image")} title="이미지로 만들기">
+            <ImageIcon size={13} />
+          </button>
+          <button onClick={() => onConvert(item, "design")} title="편집 가능한 디자인 템플릿으로 만들기">
+            <Palette size={13} />
+          </button>
+        </div>
+      )}
+
       <NodeContent
         item={item}
         editing={editing}
@@ -113,6 +128,19 @@ function NodeContent({ item, editing, setEditing, onUpdateData }) {
   if (type === "plan") {
     return (
       <PlanCard
+        item={item}
+        data={data}
+        editing={editing}
+        setEditing={setEditing}
+        onUpdateData={onUpdateData}
+        stop={stop}
+      />
+    );
+  }
+
+  if (type === "design") {
+    return (
+      <DesignCard
         item={item}
         data={data}
         editing={editing}
@@ -193,6 +221,74 @@ function NodeContent({ item, editing, setEditing, onUpdateData }) {
         />
       ) : (
         <pre className="doc-body">{data.body}</pre>
+      )}
+    </div>
+  );
+}
+
+// ── 편집 가능한 디자인 템플릿 ──
+const DESIGN_COLORS = ["#d97757", "#c2613f", "#cf8a3b", "#b86b4b", "#7c8a4b", "#4b7c8a"];
+
+function DesignCard({ item, data, editing, setEditing, onUpdateData, stop }) {
+  return (
+    <div className="design" style={{ background: data.bg, borderColor: data.accent }}>
+      <div className="design-bar" style={{ background: data.accent }} />
+      {editing ? (
+        <>
+          <input
+            className="design-title-input"
+            value={data.title}
+            autoFocus
+            style={{ color: data.accent }}
+            onPointerDown={stop}
+            onChange={(e) => onUpdateData(item.id, { title: e.target.value })}
+          />
+          <input
+            className="design-sub-input"
+            value={data.subtitle}
+            onPointerDown={stop}
+            onChange={(e) => onUpdateData(item.id, { subtitle: e.target.value })}
+          />
+          <textarea
+            className="design-points-input"
+            value={(data.points || []).join("\n")}
+            onPointerDown={stop}
+            onChange={(e) =>
+              onUpdateData(item.id, { points: e.target.value.split("\n") })
+            }
+          />
+          <div className="design-colors">
+            {DESIGN_COLORS.map((c) => (
+              <button
+                key={c}
+                style={{ background: c }}
+                onPointerDown={stop}
+                onClick={() => onUpdateData(item.id, { accent: c })}
+                title={c}
+              />
+            ))}
+            <button className="design-done" onPointerDown={stop} onClick={() => setEditing(false)}>
+              완료
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <h3 className="design-title" style={{ color: data.accent }}>
+            {data.title}
+          </h3>
+          <p className="design-sub">{data.subtitle}</p>
+          <ul className="design-points">
+            {(data.points || [])
+              .filter((p) => p && p.trim())
+              .map((p, i) => (
+                <li key={i}>
+                  <span className="design-dot" style={{ background: data.accent }} />
+                  {p}
+                </li>
+              ))}
+          </ul>
+        </>
       )}
     </div>
   );

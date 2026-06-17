@@ -92,6 +92,141 @@ body,
   border-bottom-right-radius: 12px;
 }
 
+/* 변환 액션 툴바 (선택 시) — 카드 하단 좌측에 플로팅 */
+.node-actions {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 4;
+  display: flex;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+}
+.node-actions button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #6b5d52;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.node-actions button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 편집 가능한 디자인 템플릿 */
+.design {
+  position: relative;
+  height: 100%;
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 22px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+.design-bar {
+  height: 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.design-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.design-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #5c5249;
+}
+.design-points {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #3f3833;
+}
+.design-points li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.design-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
+.design-title-input {
+  font-size: 24px;
+  font-weight: 800;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed currentColor;
+  outline: none;
+}
+.design-sub-input {
+  font-size: 14px;
+  color: #5c5249;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed #b8a89c;
+  outline: none;
+}
+.design-points-input {
+  flex: 1;
+  min-height: 120px;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+  background: rgba(255, 255, 255, 0.6);
+}
+.design-colors {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.design-colors button {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.design-colors .design-done {
+  width: auto;
+  height: 24px;
+  border-radius: 7px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+  font-size: 12px;
+}
+
 /* document */
 .doc {
   display: flex;

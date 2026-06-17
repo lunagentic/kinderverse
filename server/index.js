@@ -17,7 +17,7 @@ for (const envPath of [join(__dirname, "..", ".env"), join(__dirname, ".env")]) 
   }
 }
 
-const { generateItem } = await import("./generate.js");
+const { generateItem, convertItem } = await import("./generate.js");
 const { activeProvider } = await import("./prompts/index.js");
 const app = express();
 // 프로덕션(호스팅)은 PORT 를 주입받아 사용.
@@ -44,6 +44,21 @@ app.post("/api/generate", async (req, res) => {
   } catch (err) {
     console.error("[verse] generate error:", err);
     res.status(500).json({ error: "생성 중 오류가 발생했습니다." });
+  }
+});
+
+// 카드 → 문서/이미지/디자인 템플릿 변환
+app.post("/api/convert", async (req, res) => {
+  const { format, title, content } = req.body || {};
+  if (!["document", "image", "design"].includes(format)) {
+    return res.status(400).json({ error: "format 은 document|image|design 중 하나여야 합니다." });
+  }
+  try {
+    const result = await convertItem({ format, title, content });
+    res.json(result);
+  } catch (err) {
+    console.error("[verse] convert error:", err);
+    res.status(500).json({ error: "변환 중 오류가 발생했습니다." });
   }
 });
 

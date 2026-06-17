@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import PlanView from "./PlanView.jsx";
 import {
   Sparkles,
   LayoutGrid,
@@ -49,6 +48,32 @@ function docSuggestions(month) {
   }));
 }
 
+// 놀이아이디어 카드(payload) → 채팅용 텍스트
+function playIdeasToText(items) {
+  const ideas = items
+    .filter((it) => it?.type === "plan" && it.data?.feature_id === "play_idea")
+    .map((it) => it.data.payload?.ideas?.[0])
+    .filter(Boolean);
+  if (!ideas.length) return "";
+  return ideas
+    .map((idea, i) => {
+      const area = (idea.learning_area || []).join(" · ");
+      const materials = (idea.materials || []).join(", ");
+      const method = (idea.method || []).map((m, j) => `   ${j + 1}. ${m}`).join("\n");
+      const tips = (idea.tips || []).map((t) => `   - ${t}`).join("\n");
+      const lines = [
+        `${i + 1}) [${idea.idea_type || "놀이"}] ${idea.title}`,
+        area && `   배움영역: ${area}`,
+        materials && `   놀이재료: ${materials}`,
+        idea.intro && `   소개: ${idea.intro}`,
+        method && `   놀이 방법:\n${method}`,
+        tips && `   놀이팁:\n${tips}`,
+      ].filter(Boolean);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
 export default function ChatPanel({ onGenerate }) {
   const [messages, setMessages] = useState([
     {
@@ -94,10 +119,9 @@ export default function ChatPanel({ onGenerate }) {
       const data = await res.json();
       const items = data.items || (data.type ? [data] : []);
       onGenerate(items);
-      const cards = items.filter(
-        (it) => it?.type === "plan" && it.data?.feature_id === "play_idea"
-      );
-      setMessages((m) => [...m, { role: "assistant", text: data.reply, cards }]);
+      const detail = playIdeasToText(items);
+      const text = detail ? `${data.reply}\n\n${detail}` : data.reply;
+      setMessages((m) => [...m, { role: "assistant", text }]);
     } catch (err) {
       setMessages((m) => [
         ...m,
@@ -119,24 +143,13 @@ export default function ChatPanel({ onGenerate }) {
 
       <div className="chat-list" ref={listRef}>
         {messages.map((m, i) => (
-          <div key={i} className="msg-row">
-            <div className={"msg msg-" + m.role + (m.error ? " msg-error" : "")}>
-              {m.role === "assistant" && (
-                <span className="msg-icon">
-                  {m.error ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
-                </span>
-              )}
-              <span>{m.text}</span>
-            </div>
-            {m.cards?.length > 0 && (
-              <div className="chat-cards">
-                {m.cards.map((c, j) => (
-                  <div className="chat-card" key={j}>
-                    <PlanView featureId={c.data.feature_id} payload={c.data.payload} />
-                  </div>
-                ))}
-              </div>
+          <div key={i} className={"msg msg-" + m.role + (m.error ? " msg-error" : "")}>
+            {m.role === "assistant" && (
+              <span className="msg-icon">
+                {m.error ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
+              </span>
             )}
+            <span>{m.text}</span>
           </div>
         ))}
         {busy && (

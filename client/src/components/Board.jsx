@@ -16,6 +16,7 @@ const Board = forwardRef(function Board(
     onUpdateItem,
     onUpdateItemData,
     onRemoveItem,
+    onConvert,
   },
   ref
 ) {
@@ -124,6 +125,7 @@ const Board = forwardRef(function Board(
             onUpdate={onUpdateItem}
             onUpdateData={onUpdateItemData}
             onRemove={onRemoveItem}
+            onConvert={onConvert}
           />
         ))}
       </div>

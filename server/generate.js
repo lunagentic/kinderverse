@@ -216,6 +216,66 @@ function makeDocument(prompt) {
   };
 }
 
+// ── 카드 → 문서 / 이미지 / 편집 가능한 디자인 템플릿 변환 ──
+const DESIGN_PALETTES = [
+  { accent: "#d97757", bg: "#fbeee6" },
+  { accent: "#c2613f", bg: "#f8e4d8" },
+  { accent: "#b86b4b", bg: "#f6efe7" },
+  { accent: "#cf8a3b", bg: "#fdf3e3" },
+];
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export async function convertItem({ format, title, content }) {
+  const t = (title || "변환 결과").trim();
+  const text = (content || "").trim();
+
+  if (format === "document") {
+    return {
+      items: [{ type: "document", data: { title: t, body: text }, size: { w: 340, h: 300 } }],
+      reply: `"${t}" 내용을 문서로 만들었어요. 더블클릭하면 편집됩니다.`,
+    };
+  }
+
+  if (format === "image") {
+    const prompt = `유아 교육용 따뜻한 일러스트. 주제: ${t}. ${text.slice(0, 300)}`;
+    const img = await generateImage(prompt);
+    if (img) {
+      return {
+        items: [{ type: "image", data: { src: img.dataUrl, alt: t, source: "openai", model: img.model }, size: { w: 320, h: 320 } }],
+        reply: `"${t}" 이미지를 GPT(${img.model})로 만들었어요.`,
+      };
+    }
+    return {
+      items: [{ type: "image", data: { src: svgMockImage(t), alt: t, source: "mock" }, size: { w: 320, h: 240 } }],
+      reply: `"${t}" 이미지(목업)를 만들었어요. .env 에 OPENAI_API_KEY 설정 시 실제 이미지 생성.`,
+    };
+  }
+
+  // design: 편집 가능한 디자인 템플릿
+  const lines = text.split("\n").map((s) => s.trim()).filter(Boolean);
+  const palette = DESIGN_PALETTES[hashStr(t) % DESIGN_PALETTES.length];
+  return {
+    items: [
+      {
+        type: "design",
+        data: {
+          title: t,
+          subtitle: lines[0] || "부제목을 입력하세요",
+          points: lines.slice(1, 7).length ? lines.slice(1, 7) : ["내용을 입력하세요"],
+          accent: palette.accent,
+          bg: palette.bg,
+        },
+        size: { w: 360, h: 420 },
+      },
+    ],
+    reply: `"${t}" 편집 가능한 디자인 템플릿으로 만들었어요. 텍스트·색상을 클릭해 편집하세요.`,
+  };
+}
+
 export async function generateItem(prompt) {
   const featureId = detectFeature(prompt);
   if (featureId) return generatePlan(featureId, prompt);

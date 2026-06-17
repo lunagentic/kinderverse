@@ -100,11 +100,11 @@ export function canGenerateImage() {
   return Boolean(process.env.OPENAI_API_KEY);
 }
 
-export async function generateImage(prompt) {
+export async function generateImage(prompt, opts = {}) {
   if (!canGenerateImage()) return null;
   const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
   const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"; // 최신 (2026-04 출시)
-  const size = process.env.OPENAI_IMAGE_SIZE || "1024x1024";
+  const size = opts.size || process.env.OPENAI_IMAGE_SIZE || "1024x1024";
   const quality = process.env.OPENAI_IMAGE_QUALITY || "high"; // low|medium|high|auto
   try {
     const res = await fetch(`${base}/images/generations`, {

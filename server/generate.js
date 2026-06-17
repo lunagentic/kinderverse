@@ -41,6 +41,7 @@ function seasonOf(month) {
 function buildContext(prompt) {
   const month = parseMonth(prompt);
   return {
+    teacher_input: prompt, // 교사 입력 원문 — LLM 이 최우선으로 반영
     age_band: parseAgeBand(prompt),
     theme: parseTheme(prompt) || null,
     month: month ? `${month}월` : "",
@@ -241,8 +242,15 @@ export async function convertItem({ format, title, content }) {
   }
 
   if (format === "image") {
-    const prompt = `유아 교육용 따뜻한 일러스트. 주제: ${t}. ${text.slice(0, 300)}`;
-    const img = await generateImage(prompt);
+    const prompt = [
+      `한국 유아교육용 인포그래픽 포스터를 1장 디자인해줘.`,
+      `제목: "${t}".`,
+      `내용(이 항목들을 섹션/카드로 배치):`,
+      text.slice(0, 700),
+      `스타일: 부드러운 수채화풍 일러스트, 파스텔·따뜻한 색감, 둥근 모서리 섹션 카드, 귀여운 유아·자연·놀이 일러스트, 깔끔한 한국어 제목과 짧은 설명 텍스트, 잡지 같은 정돈된 레이아웃. 세로형 포스터.`,
+      `한국어 텍스트는 정확하고 읽기 쉽게.`,
+    ].join("\n");
+    const img = await generateImage(prompt, { size: "1024x1536" });
     if (img) {
       return {
         items: [{ type: "image", data: { src: img.dataUrl, alt: t, source: "openai", model: img.model }, size: { w: 320, h: 320 } }],

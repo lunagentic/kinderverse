@@ -5,7 +5,9 @@ services:
     name: kinderverse
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    # NODE_ENV=production 이면 npm 이 devDependencies(vite 등)를 건너뛰므로
+    # 빌드 단계에서는 --include=dev 로 강제 설치한다.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     autoDeploy: true
     envVars:

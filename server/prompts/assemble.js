@@ -31,11 +31,16 @@ export function buildPlanPrompt(featureId, context = {}, tenant = {}) {
   ].join("\n\n──────────\n\n");
 
   const mergedInput = { ...feature.input_schema, ...context, feature_id: featureId };
+  const teacherInput = (context.teacher_input || "").trim();
   const user = [
-    `다음 입력 컨텍스트로 ${feature.label}(${feature.output_type})를 생성하세요.`,
-    `입력 컨텍스트(JSON):\n${j(mergedInput)}`,
+    teacherInput &&
+      `교사 입력(원문) — 이 요청의 의도·주제·연령·요구사항을 최우선으로 반영하세요:\n"${teacherInput}"`,
+    `위 교사 입력을 바탕으로 ${feature.label}(${feature.output_type})를 생성하세요. theme 등 컨텍스트 값이 비어 있으면 교사 입력 원문에서 추론해 채우세요. 입력과 무관한 일반적 내용을 임의로 생성하지 마세요.`,
+    `보조 입력 컨텍스트(JSON):\n${j(mergedInput)}`,
     `출력: output_type="${feature.output_type}" 스키마를 따르는 JSON만 반환.`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   return { feature, system, user, input: mergedInput };
 }

@@ -17,7 +17,7 @@ for (const envPath of [join(__dirname, "..", ".env"), join(__dirname, ".env")]) 
   }
 }
 
-const { generateItem, convertItem } = await import("./generate.js");
+const { generateItem, convertItem, generateInfographicPoster } = await import("./generate.js");
 const { activeProvider } = await import("./prompts/index.js");
 const app = express();
 // 프로덕션(호스팅)은 PORT 를 주입받아 사용.
@@ -59,6 +59,19 @@ app.post("/api/convert", async (req, res) => {
   } catch (err) {
     console.error("[verse] convert error:", err);
     res.status(500).json({ error: "변환 중 오류가 발생했습니다." });
+  }
+});
+
+// 월안 → 완성 인포그래픽 포스터 이미지 1장(gpt-image). 실패 시 src:null.
+app.post("/api/infographic", async (req, res) => {
+  const plan = req.body?.payload;
+  if (!plan) return res.status(400).json({ error: "payload(월안)가 필요합니다." });
+  try {
+    const poster = await generateInfographicPoster(plan);
+    res.json({ src: poster?.src || null, model: poster?.model || null });
+  } catch (err) {
+    console.error("[verse] infographic error:", err);
+    res.json({ src: null });
   }
 });
 

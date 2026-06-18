@@ -1,17 +1,20 @@
 // PROMPTS.md §0 — L0+L1+L2(+L3) 조립 + 출력 스키마 기반 목업 생성
 import { L0_CHARTER, L1_PEDAGOGY, buildTenantBlock } from "./layers.js";
 import { PLAN_FEATURES } from "./planFeatures.js";
+import { examplesBlock } from "./examples.js";
 
 const j = (obj) => JSON.stringify(obj, null, 2);
 
 // L2 태스크 프롬프트 (역할 + 생성규칙 + 출력 스키마)
 function buildTaskBlock(feature) {
   const rules = feature.rules.map((r) => `- ${r}`).join("\n");
+  // 퓨샷: examples/<feature_id>/*.json 폴더 우선, 없으면 코드 내 fallback(feature.extra)
+  const examples = examplesBlock(feature.feature_id) || feature.extra || "";
   return [
     `[L2 태스크] feature_id=${feature.feature_id} · agent=${feature.agent} · output_type=${feature.output_type}`,
     `역할: ${feature.role}`,
     `생성 규칙:\n${rules}`,
-    feature.extra ? feature.extra : "",
+    examples,
     `출력은 아래 JSON 스키마를 정확히 따른다. 빈 문자열/배열은 실제 내용으로 채운다. JSON 외 텍스트 금지:\n${j(feature.output_schema)}`,
   ]
     .filter(Boolean)

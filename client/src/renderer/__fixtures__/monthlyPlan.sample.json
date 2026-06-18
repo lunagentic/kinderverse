@@ -1,0 +1,234 @@
+{
+  "output_type": "MonthlyPlan",
+  "plan_type": "monthly_plan",
+  "basic_info": {
+    "age_band": "3-5세",
+    "class_name": "",
+    "theme": "여름이 왔어요",
+    "life_theme": "여름",
+    "season": "여름",
+    "period": {
+      "start_date": "2023-06-01",
+      "end_date": "2023-06-30",
+      "label": "6월"
+    }
+  },
+  "rationale": {
+    "summary": "여름철 자연환경에 대한 호기심과 즐거움을 유아들이 느낄 수 있도록 다양한 놀이 경험을 제공한다. 여름철 변화에 대한 탐구를 통해 유아의 인지적, 사회적, 신체적, 언어적, 예술적 발달을 도모한다.",
+    "children_interest": {
+      "recent_interest": "계절의 변화, 여름철 활동",
+      "play_experience": "물놀이, 얼음 놀이, 여름철 곤충 탐색"
+    },
+    "season_and_environment": {
+      "seasonal_feature": "따뜻한 날씨와 길어진 낮 시간",
+      "natural_environment": "여름철 꽃과 나무, 곤충의 활동 증가",
+      "institution_event": "여름 맞이 행사"
+    },
+    "developmental_value": {
+      "cognitive": "여름철 자연현상에 대한 이해를 높인다.",
+      "social": "함께 놀이하며 협력과 의사소통을 경험한다.",
+      "physical": "야외 활동을 통해 신체 발달을 돕는다.",
+      "language": "여름과 관련된 어휘를 확장한다.",
+      "artistic": "여름의 색과 소리를 표현하는 창의적 기회를 제공한다."
+    }
+  },
+  "teacher_expectations": [
+    {
+      "goal": "여름철 자연환경의 변화를 탐색하며 호기심을 키운다.",
+      "focus": "탐색"
+    },
+    {
+      "goal": "여름철 놀이를 통해 친구들과 협력하는 경험을 쌓는다.",
+      "focus": "협력"
+    },
+    {
+      "goal": "여름에 관련된 이야기를 나누며 의사소통 능력을 발전시킨다.",
+      "focus": "의사소통"
+    },
+    {
+      "goal": "여름의 색과 소리를 통해 창의적으로 표현할 수 있다.",
+      "focus": "표현"
+    },
+    {
+      "goal": "여름철 안전한 놀이 방법을 배우고 실천한다.",
+      "focus": "문제해결"
+    }
+  ],
+  "curriculum_links": [
+    {
+      "area": "신체운동·건강",
+      "category": "신체활동",
+      "content": "다양한 신체활동에 참여하며 신체를 조절한다."
+    },
+    {
+      "area": "의사소통",
+      "category": "듣기와 말하기",
+      "content": "주변의 사물과 현상에 대해 이야기 나눈다."
+    },
+    {
+      "area": "사회관계",
+      "category": "더불어 생활하기",
+      "content": "친구와 협력하여 놀이에 참여한다."
+    },
+    {
+      "area": "예술경험",
+      "category": "표현하기",
+      "content": "자연에서 발견한 것을 창의적으로 표현한다."
+    },
+    {
+      "area": "자연탐구",
+      "category": "탐구하기",
+      "content": "계절의 변화를 탐색하고 발견한다."
+    }
+  ],
+  "weekly_flow": [
+    {
+      "week": 1,
+      "flow_stage": "관심 갖기",
+      "sub_theme": "여름과 날씨",
+      "play_ideas": [
+        {
+          "title": "여름 날씨 알아보기",
+          "core_experience": "여름 날씨에 대해 이야기 나눈다."
+        },
+        {
+          "title": "여름 그림 그리기",
+          "core_experience": "여름의 색깔을 표현해본다."
+        },
+        {
+          "title": "여름의 소리 듣기",
+          "core_experience": "여름철 자연의 소리를 탐색한다."
+        }
+      ]
+    },
+    {
+      "week": 2,
+      "flow_stage": "탐색하기",
+      "sub_theme": "여름의 생물",
+      "play_ideas": [
+        {
+          "title": "여름 곤충 관찰하기",
+          "core_experience": "여름철 곤충을 탐구한다."
+        },
+        {
+          "title": "물놀이 준비하기",
+          "core_experience": "물놀이 장비를 준비하고 사용법을 익힌다."
+        },
+        {
+          "title": "여름 꽃 만들기",
+          "core_experience": "여름 꽃을 관찰하고 다양한 재료로 표현한다."
+        }
+      ]
+    },
+    {
+      "week": 3,
+      "flow_stage": "표현하기",
+      "sub_theme": "물과 얼음 놀이",
+      "play_ideas": [
+        {
+          "title": "얼음 녹이기 실험",
+          "core_experience": "얼음이 녹는 과정을 관찰한다."
+        },
+        {
+          "title": "워터파크 만들기",
+          "core_experience": "물놀이 도구를 활용하여 워터파크를 구성한다."
+        },
+        {
+          "title": "여름 물감 놀이",
+          "core_experience": "물감을 사용하여 여름 분위기를 표현한다."
+        }
+      ]
+    },
+    {
+      "week": 4,
+      "flow_stage": "확장하기",
+      "sub_theme": "여름의 즐거움",
+      "play_ideas": [
+        {
+          "title": "여름 캠핑 놀이",
+          "core_experience": "캠핑 장비를 사용하여 여름 놀이를 확장한다."
+        },
+        {
+          "title": "여름 과일 탐험",
+          "core_experience": "여름 과일의 맛과 모양을 탐구한다."
+        },
+        {
+          "title": "신나는 여름 노래",
+          "core_experience": "여름 관련 노래를 부르고 움직인다."
+        }
+      ]
+    },
+    {
+      "week": 5,
+      "flow_stage": "공유하기",
+      "sub_theme": "여름 맞이 행사",
+      "play_ideas": [
+        {
+          "title": "여름 작품 전시회",
+          "core_experience": "여름 동안 만든 작품을 전시하고 공유한다."
+        },
+        {
+          "title": "여름 놀이 발표회",
+          "core_experience": "여름 놀이 경험을 친구들과 나눈다."
+        },
+        {
+          "title": "여름 이야기 나누기",
+          "core_experience": "여름 동안의 추억을 이야기로 나눈다."
+        }
+      ]
+    }
+  ],
+  "outdoor_and_physical_play": [
+    {
+      "week": 1,
+      "activity_name": "여름 산책",
+      "method": "여름 풍경을 관찰하며 산책한다.",
+      "expected_experience": "여름철의 자연을 직접 느끼고 탐색한다."
+    },
+    {
+      "week": 2,
+      "activity_name": "물총 놀이",
+      "method": "물총을 사용하여 친구들과 놀이한다.",
+      "expected_experience": "물의 물리적 특성을 경험하며 신체 활동을 즐긴다."
+    },
+    {
+      "week": 3,
+      "activity_name": "얼음 미끄럼틀",
+      "method": "얼음을 사용하여 미끄럼틀 놀이를 한다.",
+      "expected_experience": "물과 얼음의 온도 차이를 느끼고 즐긴다."
+    },
+    {
+      "week": 4,
+      "activity_name": "여름 캠핑 체험",
+      "method": "교실 밖에서 텐트를 치고 캠핑 놀이를 한다.",
+      "expected_experience": "야외에서의 생활을 체험하며 자연과 친해진다."
+    },
+    {
+      "week": 5,
+      "activity_name": "여름 운동회",
+      "method": "다양한 신체 활동을 통해 운동회를 진행한다.",
+      "expected_experience": "다양한 신체 활동을 통해 협력과 경쟁을 경험한다."
+    }
+  ],
+  "safety_education": {
+    "play_safety": "물놀이 시 안전규칙을 배우고 실천한다.",
+    "tool_safety": "물총, 텐트 등의 사용 안전을 익힌다.",
+    "life_safety": "여름철 일사병 예방을 위한 방법을 배운다."
+  },
+  "character_education": {
+    "core_value": "협력",
+    "practice_context": "함께 놀이하며 협력의 중요성을 배운다."
+  },
+  "events": [
+    {
+      "name": "여름 축제",
+      "date": "2023-06-25",
+      "connection": "여름 주제를 마무리하며 놀이 경험을 공유한다."
+    }
+  ],
+  "home_connection": {
+    "home_play": "가족과 함께 여름 피크닉을 계획한다.",
+    "parent_question": "여름철 자녀와 함께 어떤 활동을 하셨나요?",
+    "recommended_picture_book": "여름을 만나요"
+  }
+}

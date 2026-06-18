@@ -1,10 +1,53 @@
 import { useCallback, useRef, useState } from "react";
 import Board from "./components/Board.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
+import RendererPreview from "./components/RendererPreview.jsx";
+import {
+  renderMonthlyPlanTemplate,
+  renderColorLabFromRaw,
+  renderInfographicFromRaw,
+} from "./renderer/pipeline";
+import { toDesignDoc } from "./renderer/adapters/toDesignDoc";
 import "./board.css";
 
+// 여러 디자인 문서를 가로로 나란히 합쳐 하나의 DesignDoc 으로 (한번에 보기)
+function combineDocs(docs, labels) {
+  const GAP = 60;
+  const LABEL_H = 44;
+  const elements = [];
+  let x = 0;
+  let maxH = 0;
+  docs.forEach((dd, i) => {
+    elements.push({
+      id: `lbl${i}`, type: "text", x, y: 4, w: dd.frame.w, h: 32,
+      text: labels[i], style: { fontSize: 24, weight: 800, color: "#3f3833", align: "center" },
+    });
+    elements.push({
+      id: `bg${i}`, type: "shape", x, y: LABEL_H, w: dd.frame.w, h: dd.frame.h,
+      style: { bg: dd.frame.bg, radius: 12 },
+    });
+    dd.elements.forEach((el) => {
+      elements.push({ ...el, id: `c${i}-${el.id}`, x: el.x + x, y: el.y + LABEL_H });
+    });
+    x += dd.frame.w + GAP;
+    maxH = Math.max(maxH, dd.frame.h);
+  });
+  return {
+    output_type: "DesignDoc",
+    title: "월안 한번에 보기",
+    frame: { w: x - GAP, h: maxH + LABEL_H, bg: "#EFE9E0" },
+    elements,
+  };
+}
+
+// 개발용 진입점: ?render=monthly → 월안 Template Renderer 미리보기
+const RENDER_PREVIEW =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("render") === "monthly";
+
 let idCounter = 1;
-const nextId = () => `item-${idCounter++}`;
+// 카운터 + 랜덤 접미사 → HMR/리로드로 카운터가 리셋돼도 기존 아이템과 ID 충돌 방지
+const nextId = () => `item-${idCounter++}-${Math.random().toString(36).slice(2, 7)}`;
 
 // 객체/배열 → 읽기 좋은 텍스트 (변환 입력용)
 const SKIP_KEYS = new Set([
@@ -73,6 +116,11 @@ function cardToContent(item) {
 }
 
 export default function App() {
+  if (RENDER_PREVIEW) return <RendererPreview />;
+  return <Workspace />;
+}
+
+function Workspace() {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   // 화면 좌표 = 보드 좌표 * zoom + pan
@@ -156,6 +204,108 @@ export default function App() {
 
   // 카드 → 문서/이미지/디자인 템플릿 변환 (원본 옆에 배치)
   const convertCard = useCallback(async (item, format) => {
+    // 월안 → 디자인 문서(클라이언트 렌더). 생성 즉시 선택 → 편집 가능.
+    // 새 카드는 기존 카드들의 가장 오른쪽 끝 다음에 배치(겹치지 않게)
+    const rightOf = (prev, W) => {
+      const right = prev.reduce((m, it) => Math.max(m, it.x + it.w), item.x + item.w);
+      return { x: right + 40, y: item.y, w: W };
+    };
+
+    const addDesignDoc = (designDoc, W) => {
+      const h = Math.round((W * designDoc.frame.h) / designDoc.frame.w);
+      const id = nextId();
+      setItems((prev) => {
+        const pos = rightOf(prev, W);
+        return [...prev, { id, type: "designdoc", data: designDoc, x: pos.x, y: pos.y, w: W, h }];
+      });
+      setSelectedId(id);
+    };
+
+    // 월안 "문서": 전통적 표 형식 A4 문서 (클라이언트 렌더, monthlydoc 카드)
+    if (format === "document" && item.data?.feature_id === "monthly_plan") {
+      const payload = item.data?.payload;
+      if (!payload) return;
+      const W = 480;
+      const h = Math.round((W * 297) / 210); // A4 세로 비율
+      const id = nextId();
+      setItems((prev) => {
+        const pos = rightOf(prev, W);
+        return [
+          ...prev,
+          {
+            id,
+            type: "monthlydoc",
+            data: { payload, title: item.data?.title || "월간계획안" },
+            x: pos.x,
+            y: pos.y,
+            w: W,
+            h,
+          },
+        ];
+      });
+      setSelectedId(id);
+      return;
+    }
+
+    // 월안 "이미지": 인포그래픽 포스터 1장 (월안 → gpt-image → 이미지)
+    if (format === "image" && item.data?.feature_id === "monthly_plan") {
+      const payload = item.data?.payload;
+      if (!payload) return;
+      const W = 480;
+      const h = Math.round(W * 1.5); // 세로 포스터(1024x1536) 비율
+      const id = nextId();
+      // 1) 생성 중 카드 즉시 표시
+      setItems((prev) => {
+        const pos = rightOf(prev, W);
+        return [
+          ...prev,
+          { id, type: "infographic", data: { payload, src: null, loading: true, title: item.data?.title || "인포그래픽" }, x: pos.x, y: pos.y, w: W, h },
+        ];
+      });
+      setSelectedId(id);
+      // 2) 포스터 이미지 생성 요청 → 도착 시 교체
+      try {
+        const res = await fetch("/api/infographic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payload }),
+          signal: AbortSignal.timeout(300000),
+        });
+        const { src } = res.ok ? await res.json() : { src: null };
+        setItems((prev) =>
+          prev.map((it) => (it.id === id ? { ...it, data: { ...it.data, src: src || null, loading: false } } : it))
+        );
+      } catch {
+        setItems((prev) =>
+          prev.map((it) => (it.id === id ? { ...it, data: { ...it.data, loading: false } } : it))
+        );
+      }
+      return;
+    }
+
+    // 킨더랩 단독 (편집 가능)
+    if (format === "kinderlab" || format === "colorlab") {
+      const payload = item.data?.payload;
+      if (!payload) return;
+      addDesignDoc(toDesignDoc(renderColorLabFromRaw(payload), "킨더랩 월안"), 480);
+      return;
+    }
+
+    // 한번에 보기 (기본 · 킨더랩 · 이미지 나란히)
+    if (format === "compareall") {
+      const payload = item.data?.payload;
+      if (!payload) return;
+      const combined = combineDocs(
+        [
+          toDesignDoc(renderMonthlyPlanTemplate(payload)),
+          toDesignDoc(renderColorLabFromRaw(payload)),
+          toDesignDoc(renderInfographicFromRaw(payload)),
+        ],
+        ["기본", "킨더랩", "이미지"]
+      );
+      addDesignDoc(combined, 960);
+      return;
+    }
     const { title, content } = cardToContent(item);
     try {
       const res = await fetch("/api/convert", {

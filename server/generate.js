@@ -12,6 +12,8 @@ import {
   mockFromSchema,
   callLLM,
   generateImage,
+  buildInfographicPrompt,
+  buildPosterImagePrompt,
 } from "./prompts/index.js";
 
 // ── 컨텍스트 파서 ──
@@ -228,6 +230,25 @@ function hashStr(s) {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+// ── 월안 → 인포그래픽 데이터(LLM 변환) ──
+// 성공 시 MonthlyInfographicData JSON 반환, 키 없음/실패 시 null → 클라이언트가 결정적 빌더로 폴백.
+export async function generateInfographic(plan) {
+  if (!plan || typeof plan !== "object") return null;
+  const { system, user } = buildInfographicPrompt(plan);
+  const data = await callLLM({ system, user });
+  if (data && data.title && Array.isArray(data.keyPlayIdeas)) return data;
+  return null; // 형식 불충분 → 폴백
+}
+
+// 월안 → 완성 인포그래픽 포스터 이미지 1장 (gpt-image). 실패 시 null.
+export async function generateInfographicPoster(plan) {
+  if (!plan || typeof plan !== "object") return null;
+  const prompt = buildPosterImagePrompt(plan);
+  const img = await generateImage(prompt, { size: "1024x1536" });
+  if (!img) return null;
+  return { src: img.dataUrl, model: img.model, prompt };
 }
 
 export async function convertItem({ format, title, content }) {

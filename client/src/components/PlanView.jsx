@@ -90,7 +90,7 @@ function BasicInfo({ b }) {
     b.life_theme && `생활주제: ${b.life_theme}`,
     b.season,
     has(b.week_number) && `${b.week_number}주차`,
-    b.day && `${b.day}요일`,
+    b.day && (String(b.day).endsWith("요일") ? String(b.day) : `${b.day}요일`),
     b.date,
     period,
     b.project_type,
@@ -113,6 +113,7 @@ function CurriculumLinks({ links }) {
       {list.map((c, i) => (
         <div key={i} className="pv-item">
           <span className="pv-tag">{c.area}</span>
+          {has(c.category) && <span className="pv-tag pv-tag-soft">{c.category}</span>}
           {has(c.content) && <span className="pv-text"> {c.content}</span>}
           {has(c.expected_experience) && (
             <div className="pv-sub">↳ {c.expected_experience}</div>

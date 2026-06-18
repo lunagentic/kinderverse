@@ -1,0 +1,255 @@
+/* 인포그래픽 Preview — 세로 포스터형. 이미지 자리는 프롬프트 플레이스홀더로 표시(실제 생성 X). */
+.ig {
+  width: 720px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #fff8fb 0%, #f4f8ff 100%);
+  border-radius: 20px;
+  padding: 24px;
+  color: #4a4453;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+/* Hero */
+.ig-hero {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #ffd9e1, #cfe6f2);
+  padding: 22px 24px;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.ig-hero-title {
+  font-size: 30px;
+  font-weight: 800;
+  color: #a24e6b;
+}
+.ig-hero-sub {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b6472;
+}
+.ig-hero-msg {
+  margin-top: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #4a4453;
+  max-width: 70%;
+}
+.ig-hero-img {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 150px;
+  height: 110px;
+}
+
+/* 섹션 */
+.ig-sec {
+  margin-top: 22px;
+}
+.ig-sec-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #a24e6b;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 놀이아이디어 카드 그리드 */
+.ig-ideas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.ig-idea {
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+.ig-idea-img {
+  width: 100%;
+  height: 92px;
+  margin-bottom: 8px;
+}
+.ig-idea-title {
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.ig-idea-desc {
+  font-size: 11.5px;
+  color: #8a8392;
+  margin-top: 2px;
+}
+.ig-tags {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ig-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a24e6b;
+  background: #ffe3ec;
+  border-radius: 8px;
+  padding: 2px 7px;
+}
+
+/* 주차 흐름 */
+.ig-weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+.ig-week {
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+.ig-week-no {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #3e8e72;
+  background: #e2f2ea;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.ig-week-img {
+  width: 100%;
+  height: 70px;
+  margin: 8px 0;
+}
+.ig-week-title {
+  font-size: 13px;
+  font-weight: 800;
+}
+.ig-week-sum {
+  font-size: 11px;
+  color: #8a8392;
+  margin-top: 2px;
+}
+
+/* 교육과정 하이라이트 */
+.ig-curr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ig-curr-chip {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  font-size: 12px;
+  max-width: 220px;
+}
+.ig-curr-area {
+  font-weight: 800;
+  color: #5a5bb0;
+}
+.ig-curr-sum {
+  color: #6b6472;
+}
+
+/* 가정 연계 */
+.ig-family {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #e6f5ee;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+.ig-family-img {
+  width: 96px;
+  height: 72px;
+  flex-shrink: 0;
+}
+.ig-family-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #3e8e72;
+}
+.ig-family-msg {
+  font-size: 12px;
+  color: #4a4453;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* 이미지 프롬프트 플레이스홀더 (실제 생성 전) */
+.ig-imgslot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1.5px dashed #cbb8d6;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 6px;
+  box-sizing: border-box;
+}
+.ig-imgslot-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.ig-imgslot-style {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #a24e6b;
+  background: #ffe3ec;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.ig-imgslot-subj {
+  font-size: 9.5px;
+  color: #9a8fa6;
+  line-height: 1.25;
+}
+
+/* 이미지 프롬프트 목록 (접이식) */
+.ig-prompts {
+  margin-top: 22px;
+  font-size: 12px;
+}
+.ig-prompts summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: #a24e6b;
+}
+.ig-prompt-item {
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+}
+.ig-prompt-head {
+  font-weight: 700;
+  font-size: 11.5px;
+  margin-bottom: 3px;
+}
+.ig-prompt-body {
+  font-size: 11px;
+  color: #6b6472;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.ig-prompt-neg {
+  font-size: 10.5px;
+  color: #b08a8a;
+  margin-top: 3px;
+}

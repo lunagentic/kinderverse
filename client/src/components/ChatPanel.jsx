@@ -48,30 +48,141 @@ function docSuggestions(month) {
   }));
 }
 
-// 놀이아이디어 카드(payload) → 채팅용 텍스트
-function playIdeasToText(items) {
-  const ideas = items
-    .filter((it) => it?.type === "plan" && it.data?.feature_id === "play_idea")
-    .map((it) => it.data.payload?.ideas?.[0])
-    .filter(Boolean);
-  if (!ideas.length) return "";
-  return ideas
-    .map((idea, i) => {
-      const area = (idea.learning_area || []).join(" · ");
-      const materials = (idea.materials || []).join(", ");
-      const method = (idea.method || []).map((m, j) => `   ${j + 1}. ${m}`).join("\n");
-      const tips = (idea.tips || []).map((t) => `   - ${t}`).join("\n");
-      const lines = [
-        `${i + 1}) [${idea.idea_type || "놀이"}] ${idea.title}`,
-        area && `   배움영역: ${area}`,
-        materials && `   놀이재료: ${materials}`,
-        idea.intro && `   소개: ${idea.intro}`,
-        method && `   놀이 방법:\n${method}`,
-        tips && `   놀이팁:\n${tips}`,
-      ].filter(Boolean);
-      return lines.join("\n");
-    })
+// ── plan payload → 채팅용 텍스트 (출력 구조 순서대로) ──
+const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
+
+function basicInfoLine(b = {}) {
+  const period =
+    b.period?.label || [b.period?.start_date, b.period?.end_date].filter(Boolean).join(" ~ ");
+  return [
+    b.age_band && `연령 ${b.age_band}`,
+    b.class_name,
+    b.theme && `주제 ${b.theme}`,
+    b.sub_theme && `소주제 ${b.sub_theme}`,
+    b.life_theme && `생활주제 ${b.life_theme}`,
+    b.season,
+    period,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function playIdeaToText(p) {
+  return arr(p.ideas)
+    .map((idea) =>
+      [
+        `[${idea.idea_type || "놀이"}] ${idea.title}`,
+        arr(idea.learning_area).length && `배움영역: ${arr(idea.learning_area).join(" · ")}`,
+        arr(idea.materials).length && `놀이재료: ${arr(idea.materials).join(", ")}`,
+        idea.intro && `소개: ${idea.intro}`,
+        arr(idea.method).length &&
+          "놀이 방법:\n" + arr(idea.method).map((m, i) => `   ${i + 1}. ${m}`).join("\n"),
+        arr(idea.tips).length && "놀이팁:\n" + arr(idea.tips).map((t) => `   - ${t}`).join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n")
+    )
     .join("\n\n");
+}
+
+function monthlyToText(p) {
+  const S = [];
+  const bi = basicInfoLine(p.basic_info);
+  if (bi) S.push(`■ 기본정보\n${bi}`);
+  if (p.rationale?.summary) S.push(`■ 선정 이유\n${p.rationale.summary}`);
+
+  const exp = arr(p.teacher_expectations);
+  if (exp.length)
+    S.push("■ 교사 기대\n" + exp.map((e) => `· ${e.goal}${e.focus ? ` (${e.focus})` : ""}`).join("\n"));
+
+  const cl = arr(p.curriculum_links);
+  if (cl.length)
+    S.push(
+      "■ 교육과정 연계\n" +
+        cl
+          .map(
+            (c) => `· [${c.area}]${c.category ? ` ${c.category}` : ""}${c.content ? ` ${c.content}` : ""}`
+          )
+          .join("\n")
+    );
+
+  const wf = arr(p.weekly_flow);
+  if (wf.length)
+    S.push(
+      "■ 주차별 놀이 흐름\n" +
+        wf
+          .map((w) => {
+            const head = `${w.week}주 [${w.flow_stage || ""}] ${w.sub_theme || ""}`.trim();
+            const ideas = arr(w.play_ideas)
+              .map((pi) => `   - ${pi.title}`)
+              .join("\n");
+            return ideas ? `${head}\n${ideas}` : head;
+          })
+          .join("\n")
+    );
+
+  const od = arr(p.outdoor_and_physical_play);
+  if (od.length)
+    S.push(
+      "■ 바깥놀이·신체활동\n" +
+        od.map((o) => `· ${o.week}주 ${o.activity_name || ""}${o.method ? ` — ${o.method}` : ""}`).join("\n")
+    );
+
+  const s = p.safety_education || {};
+  const safety = [s.play_safety, s.tool_safety, s.life_safety].filter(Boolean);
+  if (safety.length) S.push("■ 안전교육\n" + safety.map((x) => `· ${x}`).join("\n"));
+
+  const c = p.character_education;
+  if (c?.core_value)
+    S.push(`■ 인성교육\n· ${c.core_value}${c.practice_context ? ` — ${c.practice_context}` : ""}`);
+
+  const ev = arr(p.events).filter((e) => e.name && e.name !== "-");
+  if (ev.length)
+    S.push(
+      "■ 행사\n" +
+        ev.map((e) => `· ${e.name}${e.date ? ` (${e.date})` : ""}${e.connection ? ` — ${e.connection}` : ""}`).join("\n")
+    );
+
+  const h = p.home_connection || {};
+  const home = [
+    h.home_play && `놀이: ${h.home_play}`,
+    h.parent_question && `질문: ${h.parent_question}`,
+    h.recommended_picture_book && `추천도서: ${h.recommended_picture_book}`,
+  ].filter(Boolean);
+  if (home.length) S.push("■ 가정 연계\n" + home.map((x) => `· ${x}`).join("\n"));
+
+  return S.join("\n\n");
+}
+
+// 그 외 plan 타입: payload 구조를 그대로 읽기 쉬운 텍스트로
+function genericToText(v, depth = 0) {
+  const pad = "  ".repeat(depth);
+  if (v == null || v === "") return "";
+  if (Array.isArray(v))
+    return v
+      .map((x) => (x && typeof x === "object" ? genericToText(x, depth) : `${pad}· ${x}`))
+      .filter(Boolean)
+      .join("\n");
+  if (typeof v === "object")
+    return Object.entries(v)
+      .map(([k, val]) => {
+        if (k === "output_type" || k === "plan_type" || k === "notice_type") return "";
+        const inner = genericToText(val, depth + 1);
+        if (!inner) return "";
+        return val && typeof val === "object" ? `${pad}${k}:\n${inner}` : `${pad}${k}: ${val}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+  return `${pad}${v}`;
+}
+
+function planToText(item) {
+  const d = item?.data;
+  if (!d) return "";
+  const p = d.payload || {};
+  if (d.feature_id === "monthly_plan") return monthlyToText(p);
+  if (d.feature_id === "play_idea") return playIdeaToText(p);
+  return genericToText(p);
 }
 
 export default function ChatPanel({ onGenerate }) {
@@ -119,7 +230,12 @@ export default function ChatPanel({ onGenerate }) {
       const data = await res.json();
       const items = data.items || (data.type ? [data] : []);
       onGenerate(items);
-      const detail = playIdeasToText(items);
+      // 보드에는 카드로, 채팅에는 출력 구조 순서대로 텍스트만 보여준다.
+      const detail = items
+        .filter((it) => it?.type === "plan")
+        .map(planToText)
+        .filter(Boolean)
+        .join("\n\n──────────\n\n");
       const text = detail ? `${data.reply}\n\n${detail}` : data.reply;
       setMessages((m) => [...m, { role: "assistant", text }]);
     } catch (err) {

@@ -55,12 +55,13 @@ export default function BoardItem({
 
   const onPointerMove = (e) => {
     if (resize.current) {
+      // 정책: 모서리 드래그 = 비율 고정 확대/축소 (A4·포스터 등 원래 비율 유지)
       const dx = (e.clientX - resize.current.startX) / zoom;
       const dy = (e.clientY - resize.current.startY) / zoom;
-      onUpdate(item.id, {
-        w: Math.max(160, resize.current.origW + dx),
-        h: Math.max(120, resize.current.origH + dy),
-      });
+      const ratio = resize.current.origH / resize.current.origW || 1;
+      const delta = Math.max(dx, dy / ratio); // 가로/세로 드래그 모두 반영
+      const newW = Math.max(200, Math.round(resize.current.origW + delta));
+      onUpdate(item.id, { w: newW, h: Math.round(newW * ratio) });
       return;
     }
     if (!drag.current) return;
@@ -979,6 +980,17 @@ const FEATURE_LABEL = {
   project_notice: "프로젝트 안내문",
 };
 
+// 유형별 배지 색상 (아이디어 vs 월안 등 한눈에 구분)
+const FEATURE_BADGE_COLOR = {
+  play_idea: "#2fa6a0", // 청록
+  mission_card: "#e07a5f", // 코랄
+  monthly_plan: "#d97757", // 주황(월안)
+  weekly_plan: "#7a5aa0", // 보라
+  daily_plan: "#3e8e72", // 초록
+  project_plan: "#5a5bb0", // 남보라
+  project_notice: "#b08a3e", // 황토
+};
+
 // ── 월안 템플릿 뷰어 (기본 / 컬러랩 / 이미지 토글) ──
 const TPL_RENDER = {
   default: renderMonthlyPlanTemplate,
@@ -1096,7 +1108,9 @@ function PlanCard({ item, data, editing, setEditing, onUpdateData, stop }) {
   return (
     <div className="plan">
       <div className="plan-head">
-        <span className="plan-badge">{FEATURE_LABEL[data.feature_id] || data.output_type}</span>
+        <span className="plan-badge" style={{ background: FEATURE_BADGE_COLOR[data.feature_id] }}>
+          {FEATURE_LABEL[data.feature_id] || data.output_type}
+        </span>
         <span className="plan-age">{data.age_band}</span>
         {data.source === "mock" && <span className="plan-mock">목업</span>}
         {/* JSON 편집 버튼 숨김 */}

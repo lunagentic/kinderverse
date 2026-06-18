@@ -80,30 +80,24 @@ export function buildPosterImagePrompt(plan) {
     })
     .join("\n  ");
 
+  const weekCount = (plan?.weekly_flow || []).slice(0, 5).length || 4;
+  const headerInfo = [life && `생활주제 ${life}`, age && `연령 ${age}`, period && `기간 ${period}`]
+    .filter(Boolean)
+    .join(" · ");
+
+  // gpt-image 용 "설명형" 프롬프트 (지시문 아님). 주차 구조 유지 + 작품(결과물) 중심.
   return [
-    `너는 유치원·어린이집 교사를 위한 "놀이중심 월안 포스터" 디자이너다.`,
-    `아래 월간 놀이계획을 교실 게시·학부모 안내·전시에 쓸 세로형 포스터 1장으로 디자인해라.`,
-    ``,
-    `[핵심 원칙]`,
-    `- 월안을 표(table)로 그대로 옮기지 마라. 표/엑셀/일정표 스타일 금지.`,
-    `- 주차 구조(1주~)는 유지한다.`,
-    `- 각 주차의 "놀이명"을 중심으로, 그 놀이의 "대표 작품·결과물(artifact)"을 추론해 시각화한다.`,
-    `  (예: "무지개 만들기"→무지개 창문 작품/색상표, "색 섞기 놀이"→색 배합 레시피 카드/컬러칩)`,
-    `- 교사가 한눈에 "이번 주 아이들이 무엇을 만들고 표현하는가"를 알 수 있어야 한다.`,
-    ``,
-    `[이미지 비중] 놀이 작품·결과물 70% · 놀이 과정 20% · 설명 텍스트 10%.`,
-    `[이미지 우선순위] 1) 완성 작품  2) 놀이 결과물  3) 놀이 재료  4) 놀이 장면.`,
-    ``,
-    `[스타일] 실사 기반(realistic). 실제 유치원 교실 분위기, 자연광, 따뜻한 색감,`,
-    `  고급 교육 잡지 스타일, 깔끔한 인쇄용 품질, 실제 교구·전시 보드 느낌.`,
-    `  금지: 과도한 캐릭터 일러스트, 아이콘만 나열, 주차별 텍스트만 배치, 놀이 장면만 크게.`,
-    ``,
-    `[레이아웃]`,
-    `- 상단 Hero: 놀이주제 "${theme}"${life ? `, 생활주제 "${life}"` : ""}${age ? `, 연령 ${age}` : ""}${period ? `, 기간 ${period}` : ""}, 짧은 소개 문구.`,
-    `- 본문: 주차별 카드(주차 제목 + 대표 작품 이미지 + 놀이명 2~4개 + 작품 설명):`,
-    `  ${weeks || "1주 탐색 / 2주 표현 / 3주 요리 / 4주 나눔"}`,
-    `- 하단: 주요 놀이자료, 가정연계, 교사 TIP.`,
-    ``,
-    `[중요] 모든 한국어 텍스트는 정확하고 또렷하게. 포스터는 "월안 설명 문서"가 아니라 "놀이를 시각화한 결과물"이다.`,
-  ].join("\n");
+    `Create ONE polished, vertical (portrait) Korean kindergarten play-based MONTHLY PLAN POSTER — magazine / editorial style, warm, friendly and cohesive, suitable for classroom display and parent notices.`,
+    `Big colorful rounded Korean title at the top center: "${theme}".`,
+    headerInfo && `A small header info ribbon below the title: "${headerInfo}", plus one short friendly intro sentence.`,
+    `Show ${weekCount} weekly cards arranged neatly, each card with: a week badge, the play names, and especially a representative ARTIFACT/RESULT image — the things children actually make and create that week (crafts, drawings, color cards, collages, simple cooking results), plus a short caption.`,
+    `Weekly content:`,
+    `  ${weeks || "1주차 탐색 / 2주차 표현 / 3주차 요리 / 4주차 나눔"}`,
+    `Also include small bottom sections: 주요 놀이자료(materials), 가정 연계(family connection), 교사 TIP.`,
+    `Style: soft warm pastel palette, rounded section cards, cute but tasteful illustrations of children's play artifacts and gentle nature decorations, soft natural lighting, clean composition with generous whitespace, premium children's educational quality.`,
+    `Emphasize the play artifacts/results rather than only play scenes. Do NOT make it a plain table or spreadsheet.`,
+    `IMPORTANT: render all Korean text accurately, cleanly and clearly legible.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

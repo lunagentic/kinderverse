@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
 import { X, FileText, Image as ImageIcon, Palette, LayoutGrid } from "lucide-react";
 import PlanView from "./PlanView.jsx";
+import Loader from "./Loader.jsx";
 import {
   renderMonthlyPlanTemplate,
   renderColorLabFromRaw,
@@ -19,27 +20,35 @@ export default function BoardItem({
   item,
   zoom,
   selected,
+  selectedCount = 1,
   onSelect,
   onUpdate,
   onUpdateData,
   onRemove,
+  onMoveSelected,
   onConvert,
 }) {
   const [editing, setEditing] = useState(false);
   const drag = useRef(null);
   const resize = useRef(null);
 
-  // 아이템 드래그 이동
+  // 아이템 드래그 이동 (Shift = 복수 선택 토글, 복수 선택 시 그룹 이동)
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
     e.stopPropagation();
-    onSelect(item.id);
+    if (e.shiftKey) onSelect(item.id, true); // 추가/해제
+    else if (!selected) onSelect(item.id, false); // 단일 선택
+    // 이미 선택 + Shift 아님 → 선택 유지(그룹 드래그)
     if (editing) return;
+    const group = selected && selectedCount > 1 && !e.shiftKey;
     drag.current = {
       startX: e.clientX,
       startY: e.clientY,
       origX: item.x,
       origY: item.y,
+      lastDx: 0,
+      lastDy: 0,
+      group,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -57,7 +66,14 @@ export default function BoardItem({
     if (!drag.current) return;
     const dx = (e.clientX - drag.current.startX) / zoom;
     const dy = (e.clientY - drag.current.startY) / zoom;
-    onUpdate(item.id, { x: drag.current.origX + dx, y: drag.current.origY + dy });
+    if (drag.current.group && onMoveSelected) {
+      // 선택된 카드 전체를 증분만큼 이동
+      onMoveSelected(dx - drag.current.lastDx, dy - drag.current.lastDy);
+      drag.current.lastDx = dx;
+      drag.current.lastDy = dy;
+    } else {
+      onUpdate(item.id, { x: drag.current.origX + dx, y: drag.current.origY + dy });
+    }
   };
 
   const endDrag = (e) => {
@@ -167,7 +183,7 @@ function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, select
   }
 
   if (type === "infographic") {
-    return <InfographicCard item={item} data={data} onUpdate={onUpdate} />;
+    return <InfographicCard item={item} data={data} selected={selected} zoom={zoom} onUpdateData={onUpdateData} />;
   }
 
   if (type === "plan") {
@@ -337,48 +353,78 @@ function MonthlyDocCard({ item, data, onUpdate, onUpdateData }) {
   );
 }
 
-// ── 인포그래픽 카드 (월안 → gpt-image 포스터 1장) ──
-function InfographicCard({ item, data }) {
+// ── 인포그래픽 카드 (이미지 포스터 ↔ 레이어 편집 토글) ──
+function InfographicCard({ item, data, selected, zoom, onUpdateData }) {
   const wrap = { position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#fff", borderRadius: 8 };
+  const stop = (e) => e.stopPropagation();
+  const layerMode = !!data.layerMode;
+
+  // 레이어 편집용 DesignDoc (인포그래픽 레이아웃 — 사진/이미지/텍스트 레이어 분리)
+  const designDoc = useMemo(
+    () => data.infoEdited || toDesignDoc(renderInfographicFromRaw(data.payload), "인포그래픽 레이어"),
+    [data.infoEdited, data.payload]
+  );
+
+  const ToggleBtn = ({ to, label }) => (
+    <button
+      className="ig-toggle-btn"
+      onPointerDown={stop}
+      onClick={() => onUpdateData(item.id, { layerMode: to })}
+    >
+      {label}
+    </button>
+  );
+
+  // 레이어 편집 모드 (사진·이미지·텍스트 레이어 분리 편집)
+  if (layerMode) {
+    return (
+      <div style={wrap}>
+        <DesignFrame
+          data={designDoc}
+          selected={selected}
+          zoom={zoom}
+          onChange={(p) => onUpdateData(item.id, { infoEdited: { ...designDoc, ...p } })}
+        />
+        <ToggleBtn to={false} label="이미지" />
+      </div>
+    );
+  }
 
   // 생성된 포스터 이미지
   if (data.src) {
     return (
       <div style={wrap}>
         <img src={data.src} alt={data.title || "인포그래픽"} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+        {data.payload && <ToggleBtn to={true} label="레이어" />}
       </div>
     );
   }
 
-  // 생성 중
+  // 생성 중 (귀여운 Lottie 로딩)
   if (data.loading) {
     return (
       <div
         style={{
           ...wrap,
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 10,
           background: "linear-gradient(180deg,#fff8fb,#f4f8ff)",
-          color: "#a24e6b",
-          textAlign: "center",
           padding: 16,
         }}
       >
-        <div style={{ fontSize: 30 }}>🎨</div>
-        <div style={{ fontWeight: 800, fontSize: 14 }}>인포그래픽 이미지 생성 중…</div>
-        <div style={{ fontSize: 11, color: "#8a8392" }}>AI가 포스터를 그리고 있어요 (1~3분)</div>
+        <Loader width={160} label="인포그래픽 생성 중…" sub="AI가 포스터를 그리고 있어요 (1~3분)" />
+        {data.payload && <ToggleBtn to={true} label="레이어" />}
       </div>
     );
   }
 
-  // 실패 → 안내
+  // 실패 → 안내 (레이어 편집으로 대체 가능)
   return (
     <div style={{ ...wrap, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#9a8fa6", textAlign: "center", padding: 16 }}>
       <div style={{ fontSize: 26 }}>🖼️</div>
-      <div style={{ fontSize: 12.5 }}>이미지 생성에 실패했어요.<br />다시 "이미지" 버튼을 눌러보세요.</div>
+      <div style={{ fontSize: 12.5 }}>이미지 생성에 실패했어요.<br />"레이어"로 편집하거나 다시 시도하세요.</div>
+      {data.payload && <ToggleBtn to={true} label="레이어" />}
     </div>
   );
 }
@@ -427,36 +473,39 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
   const activeEl = selected ? elements.find((e) => e.id === activeId && !e.locked) : null;
 
   return (
-    <div className="dframe-wrap" ref={wrapRef}>
-      <div
-        className="dframe"
-        style={{
-          width: frame.w,
-          height: frame.h,
-          background: frame.bg,
-          transform: `scale(${scale})`,
-        }}
-      >
-        {elements.map((el) =>
-          selected && !el.locked ? (
-            <EditableEl
-              key={el.id}
-              el={el}
-              scale={rndScale}
-              active={activeId === el.id}
-              editing={editId === el.id}
-              onSelect={() => setActiveId(el.id)}
-              onCycle={() => cycleStack(el.id)}
-              onEdit={() => setEditId(el.id)}
-              onEndEdit={() => setEditId(null)}
-              onChange={(p) => updateEl(el.id, p)}
-            />
-          ) : (
-            <DesignEl key={el.id} el={el} />
-          )
-        )}
+    <div className="dframe-outer">
+      <div className="dframe-wrap" ref={wrapRef}>
+        <div
+          className="dframe"
+          style={{
+            width: frame.w,
+            height: frame.h,
+            background: frame.bg,
+            transform: `scale(${scale})`,
+          }}
+        >
+          {elements.map((el) =>
+            selected && !el.locked ? (
+              <EditableEl
+                key={el.id}
+                el={el}
+                scale={rndScale}
+                active={activeId === el.id}
+                editing={editId === el.id}
+                onSelect={() => setActiveId(el.id)}
+                onCycle={() => cycleStack(el.id)}
+                onEdit={() => setEditId(el.id)}
+                onEndEdit={() => setEditId(null)}
+                onChange={(p) => updateEl(el.id, p)}
+              />
+            ) : (
+              <DesignEl key={el.id} el={el} />
+            )
+          )}
+        </div>
       </div>
 
+      {/* 컨트롤 패널 — 카드 바깥(오른쪽)에 띄워 내용을 가리지 않음 */}
       {activeEl && (
         <ControlPanel
           el={activeEl}
@@ -490,13 +539,8 @@ function ControlPanel({ el, onChange, onRemove, onClose }) {
       ? onChange({ textRole: "title", style: { ...s, weight: 800, stroke: "#FFFFFF", strokeWidth: 3 } })
       : onChange({ textRole: "content", style: { ...s, weight: 400, stroke: undefined, strokeWidth: undefined } });
 
-  const typeLabel = isText
-    ? isTitle
-      ? "제목 텍스트"
-      : "본문 텍스트"
-    : isImage
-    ? "이미지"
-    : "도형";
+  // 통합 편집 패널 — 타입은 칩으로만 표시(도형/텍스트/이미지 공통 도구)
+  const typeChip = isText ? (isTitle ? "제목" : "본문") : isImage ? "이미지" : "도형";
 
   return (
     <div
@@ -507,7 +551,9 @@ function ControlPanel({ el, onChange, onRemove, onClose }) {
       onDoubleClick={stop}
     >
       <div className="dpanel-head">
-        <span>{typeLabel} 편집</span>
+        <span>
+          편집 <span className="dpanel-chip">{typeChip}</span>
+        </span>
         <button className="dpanel-x" onClick={onClose} title="닫기">
           <X size={13} />
         </button>

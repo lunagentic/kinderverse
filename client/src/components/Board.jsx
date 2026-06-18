@@ -11,11 +11,12 @@ const Board = forwardRef(function Board(
     items,
     viewport,
     setViewport,
-    selectedId,
+    selectedIds,
     onSelect,
     onUpdateItem,
     onUpdateItemData,
     onRemoveItem,
+    onMoveSelected,
     onConvert,
   },
   ref
@@ -30,8 +31,9 @@ const Board = forwardRef(function Board(
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       setViewport((vp) => {
-        const factor = Math.exp(-e.deltaY * 0.0015);
-        const zoom = clamp(vp.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+        const factor = Math.exp(-(e.deltaY || 0) * 0.0015);
+        const z = clamp(vp.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+        const zoom = Number.isFinite(z) ? z : vp.zoom;
         const k = zoom / vp.zoom;
         // 커서 아래 지점을 고정한 채 줌
         return {
@@ -77,21 +79,7 @@ const Board = forwardRef(function Board(
     panning.current = null;
   };
 
-  // 선택된 아이템 Delete/Backspace 로 삭제
-  useEffect(() => {
-    const onKey = (e) => {
-      if (
-        (e.key === "Delete" || e.key === "Backspace") &&
-        selectedId &&
-        !/^(INPUT|TEXTAREA)$/.test(e.target.tagName) &&
-        !e.target.isContentEditable
-      ) {
-        onRemoveItem(selectedId);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId, onRemoveItem]);
+  // 키보드 단축키(삭제·복사·붙여넣기 등)는 App 에서 전역 처리
 
   const resetView = () =>
     setViewport({ panX: 0, panY: 0, zoom: 1 });
@@ -120,11 +108,13 @@ const Board = forwardRef(function Board(
             key={item.id}
             item={item}
             zoom={viewport.zoom}
-            selected={item.id === selectedId}
+            selected={selectedIds.includes(item.id)}
+            selectedCount={selectedIds.length}
             onSelect={onSelect}
             onUpdate={onUpdateItem}
             onUpdateData={onUpdateItemData}
             onRemove={onRemoveItem}
+            onMoveSelected={(dx, dy) => onMoveSelected(selectedIds, dx, dy)}
             onConvert={onConvert}
           />
         ))}
@@ -133,10 +123,10 @@ const Board = forwardRef(function Board(
       {items.length === 0 && (
         <div className="board-empty">
           <div className="board-empty-card">
-            <strong>빈 보드입니다</strong>
+            <strong>킨더보드를 빛나는 영감으로 채워주세요 ✨</strong>
             <p>
-              오른쪽 채팅창에 입력해 콘텐츠를 생성하세요.
-              <br />예) "회의록 문서 만들어줘", "여름 세일 포스터 템플릿", "고양이 이미지"
+              오른쪽 채팅창에 떠오르는 놀이를 입력하면 보드가 채워져요.
+              <br />예) "6월 '여름이 왔어요' 월간계획안", "물놀이 놀이 아이디어", "여름 프로젝트 안내문"
             </p>
           </div>
         </div>
@@ -144,7 +134,7 @@ const Board = forwardRef(function Board(
 
       <div className="board-controls" onPointerDown={(e) => e.stopPropagation()}>
         <button onClick={() => zoomBy(1 / 1.2)} title="축소"><Minus size={16} /></button>
-        <span className="zoom-label">{Math.round(viewport.zoom * 100)}%</span>
+        <span className="zoom-label">{Math.round((Number.isFinite(viewport.zoom) ? viewport.zoom : 1) * 100)}%</span>
         <button onClick={() => zoomBy(1.2)} title="확대"><Plus size={16} /></button>
         <button onClick={resetView} title="뷰 초기화"><Maximize size={15} /></button>
       </div>

@@ -11,6 +11,7 @@ import {
   Mail,
   AlertTriangle,
 } from "lucide-react";
+import Loader from "./Loader.jsx";
 
 // 유치원 월별 놀이주제 (누리과정 기반 대표 주제)
 const MONTHLY_PLAY_THEMES = {
@@ -269,15 +270,15 @@ export default function ChatPanel({ onGenerate }) {
           </div>
         ))}
         {busy && (
-          <div className="msg msg-assistant msg-typing">
-            <span className="msg-icon"><Sparkles size={14} /></span>
+          <div className="msg msg-assistant msg-typing" style={{ alignItems: "center", gap: 6 }}>
+            <Loader width={88} />
             <span>생성 중…</span>
           </div>
         )}
       </div>
 
       <div className="chat-suggest-label">
-        <LayoutGrid size={13} /> 추천 문서 · {month}월 「{theme}」
+        <LayoutGrid size={13} /> 추천 주제 · {month}월 「{theme}」
       </div>
       <div className="chat-suggest">
         {suggestions.map((s) => (

@@ -361,7 +361,7 @@ function LayoutView({ docs }) {
           background: "#fff",
           borderRadius: 12,
           boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
-          overflow: "hidden",
+          overflow: "visible",
         }}
       >
         <Boundary key={tpl + (edit ? "-edit" : "")}>

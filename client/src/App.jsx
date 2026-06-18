@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Board from "./components/Board.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
 import RendererPreview from "./components/RendererPreview.jsx";
@@ -122,7 +122,16 @@ export default function App() {
 
 function Workspace() {
   const [items, setItems] = useState([]);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]); // 복수 선택
+  const setSelectedId = (id) => setSelectedIds(id == null ? [] : [id]);
+  // Shift 등으로 추가 선택 토글
+  const selectItem = useCallback((id, additive) => {
+    if (id == null) return setSelectedIds([]);
+    setSelectedIds((prev) =>
+      additive ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]
+    );
+  }, []);
+  const clipboard = useRef([]);
   // 화면 좌표 = 보드 좌표 * zoom + pan
   const [viewport, setViewport] = useState({ panX: 0, panY: 0, zoom: 1 });
   const boardRef = useRef(null);
@@ -157,24 +166,26 @@ function Workspace() {
       if (!list.length) return;
       const { cx, cy } = viewCenter();
 
-      setItems((prev) => {
-        if (list.length === 1) {
-          const step = prev.length % 8;
-          const offX = (step - 3.5) * 60 + (Math.random() - 0.5) * 24;
-          const offY = (step % 4) * 40 + (Math.random() - 0.5) * 24;
-          return [...prev, toItem(list[0], cx + offX, cy + offY)];
+      // 기존 카드와 겹치지 않는 위치 탐색 (중앙 기준 → 우/하단으로 밀기)
+      const overlaps = (a, b) =>
+        a.x < b.x + b.w + 24 && a.x + a.w + 24 > b.x && a.y < b.y + b.h + 24 && a.y + a.h + 24 > b.y;
+      const freeSpot = (placed, w, h, x0, y0) => {
+        let x = x0, y = y0, tries = 0;
+        while (placed.some((it) => overlaps({ x, y, w, h }, it)) && tries < 400) {
+          x += 60;
+          if (x > x0 + 1400) { x = x0; y += 60; }
+          tries++;
         }
-        // 격자 배치 (최대 3열)
-        const cols = Math.min(list.length, 3);
-        const gapX = 340;
-        const gapY = 360;
-        const startX = cx - ((cols - 1) * gapX) / 2;
-        const startY = cy - 120;
-        const created = list.map((g, i) => {
-          const r = Math.floor(i / cols);
-          const c = i % cols;
+        return { x, y };
+      };
+      setItems((prev) => {
+        const placed = [...prev];
+        const created = list.map((g) => {
           const size = g.size ?? { w: 300, h: 220 };
-          return toItem(g, startX + c * gapX, startY + r * gapY + size.h / 2);
+          const { x, y } = freeSpot(placed, size.w, size.h, cx - size.w / 2, cy - size.h / 2);
+          const it = { id: nextId(), type: g.type, data: g.data, x, y, w: size.w, h: size.h };
+          placed.push(it);
+          return it;
         });
         return [...prev, ...created];
       });
@@ -199,8 +210,66 @@ function Workspace() {
 
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
-    setSelectedId((cur) => (cur === id ? null : cur));
+    setSelectedIds((prev) => prev.filter((x) => x !== id));
   }, []);
+
+  // 최신 items / selectedIds 를 ref 로 추적 (키보드 핸들러용)
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const selRef = useRef(selectedIds);
+  selRef.current = selectedIds;
+
+  const removeSelected = useCallback(() => {
+    const sel = selRef.current;
+    if (!sel.length) return;
+    setItems((prev) => prev.filter((it) => !sel.includes(it.id)));
+    setSelectedIds([]);
+  }, []);
+
+  // 선택 아이템 전체를 delta 만큼 이동(그룹 드래그용)
+  const moveSelectedBy = useCallback((ids, dx, dy) => {
+    setItems((prev) => prev.map((it) => (ids.includes(it.id) ? { ...it, x: it.x + dx, y: it.y + dy } : it)));
+  }, []);
+
+  const copySelected = useCallback(() => {
+    const sel = selRef.current;
+    clipboard.current = itemsRef.current.filter((it) => sel.includes(it.id)).map((it) => ({ ...it }));
+  }, []);
+
+  const pasteClipboard = useCallback(() => {
+    const buf = clipboard.current;
+    if (!buf || !buf.length) return;
+    const created = buf.map((it) => ({ ...it, id: nextId(), x: it.x + 28, y: it.y + 28 }));
+    setItems((prev) => [...prev, ...created]);
+    setSelectedIds(created.map((c) => c.id));
+    clipboard.current = created.map((c) => ({ ...c })); // 연속 붙여넣기 시 누적 오프셋
+  }, []);
+
+  const duplicateSelected = useCallback(() => {
+    const sel = selRef.current;
+    const created = itemsRef.current
+      .filter((it) => sel.includes(it.id))
+      .map((it) => ({ ...it, id: nextId(), x: it.x + 28, y: it.y + 28 }));
+    if (!created.length) return;
+    setItems((prev) => [...prev, ...created]);
+    setSelectedIds(created.map((c) => c.id));
+  }, []);
+
+  // 전역 단축키: 복사(⌘/Ctrl+C) · 붙여넣기(V) · 복제(D) · 삭제(Delete/Backspace)
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target;
+      if (/^(INPUT|TEXTAREA)$/.test(t.tagName) || t.isContentEditable) return;
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "c") { copySelected(); }
+      else if (mod && e.key.toLowerCase() === "v") { e.preventDefault(); pasteClipboard(); }
+      else if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); duplicateSelected(); }
+      else if (e.key === "Delete" || e.key === "Backspace") { removeSelected(); }
+      else if (e.key === "Escape") { setSelectedIds([]); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [copySelected, pasteClipboard, duplicateSelected, removeSelected]);
 
   // 카드 → 문서/이미지/디자인 템플릿 변환 (원본 옆에 배치)
   const convertCard = useCallback(async (item, format) => {
@@ -252,7 +321,7 @@ function Workspace() {
       const payload = item.data?.payload;
       if (!payload) return;
       const W = 480;
-      const h = Math.round(W * 1.5); // 세로 포스터(1024x1536) 비율
+      const h = Math.round((W * 297) / 210); // A4 세로 비율
       const id = nextId();
       // 1) 생성 중 카드 즉시 표시
       setItems((prev) => {
@@ -344,11 +413,12 @@ function Workspace() {
         items={items}
         viewport={viewport}
         setViewport={setViewport}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
+        selectedIds={selectedIds}
+        onSelect={selectItem}
         onUpdateItem={updateItem}
         onUpdateItemData={updateItemData}
         onRemoveItem={removeItem}
+        onMoveSelected={moveSelectedBy}
         onConvert={convertCard}
       />
       <ChatPanel onGenerate={addGenerated} />

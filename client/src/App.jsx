@@ -132,6 +132,7 @@ function Workspace() {
     );
   }, []);
   const clipboard = useRef([]);
+  const [chatOpen, setChatOpen] = useState(false); // 모바일 채팅 시트 토글
   // 화면 좌표 = 보드 좌표 * zoom + pan
   const [viewport, setViewport] = useState({ panX: 0, panY: 0, zoom: 1 });
   const boardRef = useRef(null);
@@ -190,6 +191,7 @@ function Workspace() {
         return [...prev, ...created];
       });
       setSelectedId(null);
+      setChatOpen(false); // 모바일: 생성 후 보드로 돌아가기
     },
     [viewCenter]
   );
@@ -407,7 +409,7 @@ function Workspace() {
   }, []);
 
   return (
-    <div className="layout">
+    <div className={"layout" + (chatOpen ? " chat-open" : "")}>
       <Board
         ref={boardRef}
         items={items}
@@ -422,6 +424,15 @@ function Workspace() {
         onConvert={convertCard}
       />
       <ChatPanel onGenerate={addGenerated} />
+      {/* 모바일: 채팅 시트 열기/닫기 (데스크톱에선 숨김) */}
+      <button
+        className="mobile-chat-fab"
+        onClick={() => setChatOpen((o) => !o)}
+        aria-label={chatOpen ? "채팅 닫기" : "채팅 열기"}
+      >
+        {chatOpen ? "✕" : "💬 채팅"}
+      </button>
+      {chatOpen && <div className="mobile-chat-backdrop" onClick={() => setChatOpen(false)} />}
     </div>
   );
 }

@@ -125,7 +125,7 @@ const Board = forwardRef(function Board(
           <div className="board-empty-card">
             <strong>킨더보드를 빛나는 영감으로 채워주세요 ✨</strong>
             <p>
-              오른쪽 채팅창에 떠오르는 놀이를 입력하면 보드가 채워져요.
+              채팅창에 떠오르는 놀이를 입력하면 보드가 채워져요.
               <br />예) "6월 '여름이 왔어요' 월간계획안", "물놀이 놀이 아이디어", "여름 프로젝트 안내문"
             </p>
           </div>

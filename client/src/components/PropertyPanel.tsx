@@ -14,6 +14,8 @@ export interface PropertyPanelProps {
   // image 레이어 누끼(배경 제거).
   onRemoveBackground?: (layerId: string) => void;
   nukiBusy?: boolean;
+  // 이 요소를 컴포넌트로 저장 (사용자가 원할 때만).
+  onSaveAsset?: (layerId: string) => void;
 }
 
 const ICON_NAMES = ["palette", "paint", "color-chip", "sun", "cloud", "wave", "rainbow", "tree", "shell", "sandcastle", "ball", "music", "book", "star", "fish", "flower"];
@@ -39,7 +41,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-export default function PropertyPanel({ layer, onUpdateLayer, onGenerateImage, genState, onRemoveBackground, nukiBusy }: PropertyPanelProps) {
+export default function PropertyPanel({ layer, onUpdateLayer, onGenerateImage, genState, onRemoveBackground, nukiBusy, onSaveAsset }: PropertyPanelProps) {
   if (!layer) {
     return <div style={{ ...wrap, color: "#a99" }}>레이어를 선택하면 속성이 표시됩니다.</div>;
   }
@@ -157,6 +159,17 @@ export default function PropertyPanel({ layer, onUpdateLayer, onGenerateImage, g
                 style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: "1px solid #4f9d69", background: nukiBusy ? "#bfe0cc" : "#4f9d69", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
               >
                 {nukiBusy ? "처리 중…" : "🪄 배경 제거(누끼)"}
+              </button>
+            </Field>
+          )}
+          {onSaveAsset && layer.src && (
+            <Field label="컴포넌트로 저장">
+              <button
+                onClick={() => onSaveAsset(layer.id)}
+                title="이 요소(그림/꾸밈)를 컴포넌트로 저장 — 다른 카드에서 재사용"
+                style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: "1px solid #5B53A8", background: "#5B53A8", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                💾 이 요소 컴포넌트로 저장
               </button>
             </Field>
           )}

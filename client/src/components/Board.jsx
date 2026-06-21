@@ -18,6 +18,8 @@ const Board = forwardRef(function Board(
     onRemoveItem,
     onMoveSelected,
     onConvert,
+    onEditCard,
+    onMakeWeekCard,
   },
   ref
 ) {
@@ -116,6 +118,8 @@ const Board = forwardRef(function Board(
             onRemove={onRemoveItem}
             onMoveSelected={(dx, dy) => onMoveSelected(selectedIds, dx, dy)}
             onConvert={onConvert}
+            onEditCard={onEditCard}
+            onMakeWeekCard={onMakeWeekCard}
           />
         ))}
       </div>

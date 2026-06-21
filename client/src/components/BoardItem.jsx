@@ -15,6 +15,8 @@ import {
   MonthlyInfographicFromRaw,
 } from "../renderer/infographic/MonthlyInfographicRenderer";
 import { DECO_IMAGES } from "../renderer/image/assetManifest";
+import WeekCardEditor from "./WeekCardEditor";
+import { buildPosterWeekCard } from "../templates/buildPosterWeekCard";
 
 export default function BoardItem({
   item,
@@ -27,6 +29,8 @@ export default function BoardItem({
   onRemove,
   onMoveSelected,
   onConvert,
+  onEditCard,
+  onMakeWeekCard,
 }) {
   const [editing, setEditing] = useState(false);
   const drag = useRef(null);
@@ -145,6 +149,11 @@ export default function BoardItem({
               <button onClick={() => onConvert(item, "compareall")} title="한번에 보기">
                 <LayoutGrid size={13} />
               </button>
+              {onMakeWeekCard && (
+                <button onClick={() => onMakeWeekCard(item)} title="이 월안으로 주차 카드 만들기">
+                  🧩
+                </button>
+              )}
             </>
           ) : (
             <button onClick={() => onConvert(item, "design")} title="디자인 템플릿">
@@ -162,6 +171,7 @@ export default function BoardItem({
         onUpdateData={onUpdateData}
         selected={selected}
         zoom={zoom}
+        onEditCard={onEditCard}
       />
 
       {selected && (
@@ -171,9 +181,40 @@ export default function BoardItem({
   );
 }
 
-function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, selected, zoom }) {
+// 주차 카드 라이브 미리보기 (보드 위) — PNG 아님, HTML 렌더라 Jua 폰트 그대로 적용.
+function WeekCardPreview({ item, data, onEditCard }) {
+  const template = useMemo(() => {
+    const base = (data && data.template && data.template.layers) ? data.template : buildPosterWeekCard((data && data.weekIndex) || 0);
+    return {
+      name: "주차 카드",
+      canvas: base.canvas,
+      layers: base.layers,
+      background: base.background || { color: "#ffffff", radius: 28 },
+    };
+  }, [data]);
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", borderRadius: 14 }}>
+      <WeekCardEditor template={template} width={item.w} readOnly />
+      <button
+        className="weekcard-edit-btn"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onEditCard && onEditCard(item); }}
+        title="이 카드를 편집"
+        style={{ position: "absolute", right: 36, top: 6, zIndex: 5, padding: "4px 10px", borderRadius: 8, border: "none", background: "#5B53A8", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}
+      >
+        ✏️ 편집하기
+      </button>
+    </div>
+  );
+}
+
+function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, selected, zoom, onEditCard }) {
   const { type, data } = item;
   const stop = (e) => e.stopPropagation();
+
+  if (type === "weekcard") {
+    return <WeekCardPreview item={item} data={data} onEditCard={onEditCard} />;
+  }
 
   if (type === "template") {
     return <TemplateCard item={item} data={data} selected={selected} zoom={zoom} onUpdate={onUpdate} onUpdateData={onUpdateData} stop={stop} />;
@@ -396,7 +437,6 @@ function InfographicCard({ item, data, selected, zoom, onUpdateData }) {
     return (
       <div style={wrap}>
         <img src={data.src} alt={data.title || "인포그래픽"} draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
-        {data.payload && <ToggleBtn to={true} label="레이어" />}
       </div>
     );
   }
@@ -415,7 +455,6 @@ function InfographicCard({ item, data, selected, zoom, onUpdateData }) {
         }}
       >
         <Loader width={160} label="인포그래픽 생성 중…" sub="AI가 포스터를 그리고 있어요 (1~3분)" />
-        {data.payload && <ToggleBtn to={true} label="레이어" />}
       </div>
     );
   }

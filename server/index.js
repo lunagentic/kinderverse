@@ -19,7 +19,7 @@ for (const envPath of [join(__dirname, "..", ".env"), join(__dirname, ".env")]) 
 
 const { generateItem, convertItem, generateInfographicPoster } = await import("./generate.js");
 const { activeProvider } = await import("./prompts/index.js");
-const { generateImage, generateImageWithReference } = await import("./prompts/llm.js");
+const { generateImage, generateImageWithReference, callLLM, hasLLM } = await import("./prompts/llm.js");
 const app = express();
 // 프로덕션(호스팅)은 PORT 를 주입받아 사용.
 // 개발 프리뷰에서는 클라이언트(vite)가 PORT 를 쓰므로 서버는 API_PORT 로 분리(충돌 방지).
@@ -95,6 +95,28 @@ app.post("/api/weekcard-image", async (req, res) => {
   } catch (err) {
     console.error("[verse] weekcard-image error:", err);
     res.json({ src: null });
+  }
+});
+
+// 놀이 주제·놀이명 → 클레이 아이콘 영문 subject 한 줄 (v3: LLM 프롬프트 작성)
+app.post("/api/icon-prompt", async (req, res) => {
+  const theme = (req.body?.theme || "").trim();
+  const plays = Array.isArray(req.body?.plays) ? req.body.plays : [];
+  if (!hasLLM || !hasLLM()) return res.json({ subject: null });
+  try {
+    const system =
+      "You design a single cute 3D clay (claymation) kindergarten icon for a Korean weekly play theme. " +
+      'Reply ONLY as JSON: {"subject":"..."}. The subject is a short English phrase (3-12 words) describing the ONE most ' +
+      "representative concrete object (or small group) for the theme. No style words, no quotes inside.";
+    const user =
+      `주제(theme): ${theme}\n놀이명(play activities): ${plays.join(", ")}\n` +
+      `Return the best single clay object subject for preschoolers as JSON {"subject":"..."}. English subject only.`;
+    const out = await callLLM({ system, user });
+    const subject = (out && typeof out.subject === "string" ? out.subject : "").trim().replace(/^["'`]+|["'`]+$/g, "").slice(0, 140);
+    res.json({ subject: subject || null });
+  } catch (err) {
+    console.error("[verse] icon-prompt error:", err);
+    res.json({ subject: null });
   }
 });
 

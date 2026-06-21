@@ -5,6 +5,7 @@ import type { EditableLayer } from "../templates/buildEditableWeekCardTemplate";
 export interface SavedComponent {
   id: string;
   name: string;
+  kind?: "card" | "asset"; // card=카드 전체 / asset=단일 요소(슬롯에 채움). 기본 card.
   canvas: { w: number; h: number };
   layers: EditableLayer[];
   thumb?: string; // 미리보기 dataURL (PNG)

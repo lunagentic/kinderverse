@@ -24,12 +24,15 @@ export async function exportNodeToPng(
   const displayWidth = node.offsetWidth || width;
   const pixelRatio = width / displayWidth;
 
-  const dataUrl = await toPng(node, {
-    pixelRatio,
-    backgroundColor, // 배경 포함 (둥근 모서리 바깥 투명 영역 채움)
-    cacheBust,
-    skipFonts: true, // 외부(Google) 폰트 임베드 시 cross-origin 에러 방지
-  });
+  // 폰트(Jua 등)를 임베드해 화면과 동일하게 렌더 → 텍스트 잘림 방지.
+  //  임베드 실패(CORS 등) 시에만 폰트 없이 재시도(깨지지 않게).
+  let dataUrl: string;
+  try {
+    dataUrl = await toPng(node, { pixelRatio, backgroundColor, cacheBust, skipFonts: false });
+  } catch (e) {
+    console.warn("폰트 임베드 실패 — 폰트 없이 내보냅니다:", e);
+    dataUrl = await toPng(node, { pixelRatio, backgroundColor, cacheBust, skipFonts: true });
+  }
 
   if (download) {
     const a = document.createElement("a");

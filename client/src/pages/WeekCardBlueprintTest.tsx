@@ -3,7 +3,7 @@
 //  - 레이아웃: 좌측 주차/제목/놀이 텍스트(편집) + 우측 작품 사진 3장(이미지 슬롯)
 //  - 스타일 기준(레퍼런스): 업로드한 실제 포스터 / 월안 포스터 생성 → 슬롯을 그 분위기로 컨디셔닝
 //  - 텍스트/이미지/배경 편집 + 1200px PNG export
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { sampleSummerPlan } from "../data/sampleSummerPlan";
 import { monthPlanPoster } from "../data/monthPlanPoster";
 import { transformMonthlyPlanToInfographic } from "../transformers/monthlyToInfographic";
@@ -19,6 +19,8 @@ import { generateImageForPrompt } from "../utils/imageCache";
 import { sampleMonthPoster } from "../utils/sampleMonthPoster";
 import { loadComponents, saveComponent, deleteComponent } from "../utils/componentStore";
 import { removeBackground } from "../utils/removeBackground";
+import { getAsset, getCachedAsset, descriptorFor } from "../utils/assetLibrary";
+import { buildPosterWeekCard, RICH_W, RICH_H } from "../templates/buildPosterWeekCard";
 
 interface SlotGenState {
   loading: boolean;
@@ -29,15 +31,13 @@ interface SlotGenState {
 const PACK = getStylePack("summer_play"); // 모든 주차 공유 — 폰트/팔레트 일치
 const W = 1280;
 const H = 470;
-// ✏️ 편집: 월간계획안 포스터의 "주차 카드"를 코드 레이어로 그대로 재현(편집 가능).
-const RICH_W = 900;
-const RICH_H = 480;
+// ✏️ 편집: 월간계획안 포스터의 "주차 카드" — 빌더는 ../templates/buildPosterWeekCard 로 공용화(보드 프리뷰와 일치).
 const SLOT_IDS = ["image-1", "image-2", "image-3"];
 // 슬롯 프롬프트(캐시 키 일치를 위해 한 곳에서 생성)
 const slotPromptFor = (wk: any, k: number) =>
   `유치원 "${wk.playNames[k] || wk.title}" 활동의 아이 작품 사진 한 장, 밝은 여름 분위기, 글자 없음`;
 
-export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = false }: { autoCrop?: boolean; richEdit?: boolean }) {
+export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = false, onPlaceOnBoard, initialTemplate = null, initialWeek = 0, onApply }: { autoCrop?: boolean; richEdit?: boolean; onPlaceOnBoard?: (src: string, size: { w: number; h: number }) => void; initialTemplate?: { canvas: { w: number; h: number }; layers: EditableLayer[] } | null; initialWeek?: number; onApply?: (template: { canvas: { w: number; h: number }; layers: EditableLayer[] }) => void }) {
   const ig = useMemo(() => transformMonthlyPlanToInfographic(sampleSummerPlan), []);
 
   // 한 주차를 "밴드"(좌 텍스트 + 우 이미지 3장) 레이어로 빌드
@@ -75,55 +75,15 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
   // ✏️ 편집: 월간계획안 포스터의 "주차 카드"를 코드 레이어로 그대로 재현 → 모든 요소 편집 가능.
   //  - 재구현(편집): 카드 배경/테두리 · 가장자리 꾸밈 · 주차 배지 · 제목 · 놀이명(라벨+값)
   //  - 장식 그림: 실제 그림을 그대로 쓰도록 "이미지 슬롯" (✂️ 캡처/업로드로 채움 · AI 생성 아님)
-  const buildRichWeekCard = (idx: number): EditableLayer[] => {
-    // 콘텐츠(주차/제목/놀이명)는 "생성 소스 데이터"(프롬프트가 쓰는 plan = ig.weeks)에서 — 놀이명 3개 포함.
-    const week = ig.weeks[idx % ig.weeks.length];
-    // 표시 스타일(색/테두리/장식)만 포스터 설정에서.
-    const w = monthPlanPoster.weeks[idx % monthPlanPoster.weeks.length];
-    const cw = RICH_W, ch = RICH_H;
-    const ink = "#4A423B";
-    // 장식 그림(좌측 컬럼) — 포스터의 누끼 그림 2개 → 실제 이미지 슬롯(캡처/업로드 → 🪄누끼로 배경 제거)
-    const illos: EditableLayer[] = (w.illos || []).slice(0, 2).map((_kind, i) => ({
-      id: `illo-${i + 1}`, type: "image", name: `포스터 그림 ${i + 1}`, editable: true, locked: false,
-      x: 52 + i * 12, y: 126 + i * 150, width: 176, height: 150,
-      content: `포스터 그림 ${i + 1} · ✂️캡처/업로드`, src: undefined, style: { fit: "contain", radius: 12, background: "transparent" },
-    }));
-    // 가장자리 꾸밈 요소 — 포스터 배경 가장자리의 작은 장식(점/별/꽃). 색은 주차색, 모두 편집/이동 가능.
-    const decos: EditableLayer[] = [
-      { id: "deco-star", type: "icon", name: "꾸밈 별", editable: true, locked: false, x: cw - 84, y: 18, width: 46, height: 42, content: "star", src: undefined, style: { iconKind: "star", size: 26, colors: [] } },
-      { id: "deco-flower", type: "icon", name: "꾸밈 꽃", editable: true, locked: false, x: 24, y: ch - 66, width: 46, height: 46, content: "flower", src: undefined, style: { iconKind: "flower", size: 26, colors: [] } },
-      { id: "deco-dot-1", type: "shape", name: "꾸밈 점 1", editable: true, locked: false, x: cw - 134, y: 30, width: 14, height: 14, content: undefined, src: undefined, style: { fill: w.badge, backgroundColor: w.badge, radius: 7, opacity: 0.45 } },
-      { id: "deco-dot-2", type: "shape", name: "꾸밈 점 2", editable: true, locked: false, x: cw - 60, y: ch - 52, width: 16, height: 16, content: undefined, src: undefined, style: { fill: w.badge, backgroundColor: w.badge, radius: 8, opacity: 0.4 } },
-      { id: "deco-dot-3", type: "shape", name: "꾸밈 점 3", editable: true, locked: false, x: Math.round(cw / 2), y: ch - 44, width: 12, height: 12, content: undefined, src: undefined, style: { fill: w.badge, backgroundColor: w.badge, radius: 6, opacity: 0.4 } },
-    ];
-    // 놀이명 (생성 데이터의 playNames — 3개) — "· 놀이명:" 라벨[색]+ 값[검정] 분리 → 활동명만 따로 편집
-    const plays: EditableLayer[] = week.playNames.flatMap((name, i) => {
-      const y = 150 + i * 84;
-      return [
-        { id: `play-${i + 1}-label`, type: "text", name: `놀이명 라벨 ${i + 1}`, editable: true, locked: false, x: 332, y, width: 134, height: 40, content: "· 놀이명:", src: undefined, style: { fontSize: 25, fontWeight: 800, color: w.badge, align: "left", lineClamp: 1, fontFamily: PACK.font } } as EditableLayer,
-        { id: `play-${i + 1}-value`, type: "text", name: `놀이명 ${i + 1}`, editable: true, locked: false, x: 466, y, width: 392, height: 40, content: name, src: undefined, style: { fontSize: 25, fontWeight: 700, color: ink, align: "left", lineClamp: 1, fontFamily: PACK.font } } as EditableLayer,
-      ];
-    });
-    return [
-      // 카드: 배경색 + 테두리 (포스터 주차 카드)
-      { id: "background", type: "shape", name: "카드 배경", editable: true, locked: true, x: 0, y: 0, width: cw, height: ch, content: undefined, src: undefined, style: { fill: w.cardBg, backgroundColor: w.cardBg, radius: 28, border: w.border, borderWidth: 3 } },
-      // 가장자리 꾸밈
-      ...decos,
-      // 주차 배지 + 제목 (상단)
-      { id: "week-badge", type: "text", name: "주차 배지", editable: true, locked: false, x: 40, y: 36, width: 92, height: 50, content: week.weekLabel, src: undefined, style: { fontSize: 24, fontWeight: 800, color: "#ffffff", align: "center", backgroundColor: w.badge, radius: 14, fontFamily: PACK.font } },
-      { id: "title", type: "text", name: "제목", editable: true, locked: false, x: 148, y: 32, width: 606, height: 58, content: week.title, src: undefined, style: { fontSize: 42, fontWeight: 800, color: w.badge, align: "left", lineClamp: 1, fontFamily: PACK.font } },
-      // 장식 그림 (좌측, 실제 이미지 슬롯)
-      ...illos,
-      // 놀이명 (우측, 라벨+값)
-      ...plays,
-    ];
-  };
+  const buildRichWeekCard = (idx: number): EditableLayer[] => buildPosterWeekCard(idx).layers;
 
-  const [weekIndex, setWeekIndex] = useState(0);
+  const [weekIndex, setWeekIndex] = useState(initialWeek || 0);
   const built = useMemo(() => buildForWeek(weekIndex), [weekIndex]);
   const { week, slotPromptById } = built;
 
-  const [layers, setLayers] = useState(() => (richEdit ? buildRichWeekCard(0) : buildForWeek(0).layers));
+  const [layers, setLayers] = useState(() =>
+    initialTemplate?.layers ? JSON.parse(JSON.stringify(initialTemplate.layers)) : richEdit ? buildRichWeekCard(initialWeek || 0) : buildForWeek(0).layers
+  );
   const [selectedId, setSelectedId] = useState(null as string | null);
   const [exporting, setExporting] = useState(false);
   const [genByLayer, setGenByLayer] = useState({} as Record<string, SlotGenState>);
@@ -133,11 +93,47 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
   const [cropImage, setCropImage] = useState(() => sampleMonthPoster() as string | null); // 크로퍼 기본 = 샘플 월안 포스터
   const [cropReference, setCropReference] = useState(null as string | null); // 원본 선택 영역(나란히 비교용)
   const [capturedPhotos, setCapturedPhotos] = useState([] as string[]); // 캡처한 개별 사진들
-  const [cardCanvas, setCardCanvas] = useState(richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 크롭/리치 시 비율에 맞춤
+  const [cardCanvas, setCardCanvas] = useState(initialTemplate?.canvas ? initialTemplate.canvas : richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 크롭/리치 시 비율에 맞춤
   const stageRef = useRef(null as HTMLDivElement | null);
   const [components, setComponents] = useState(() => loadComponents()); // 저장한 컴포넌트들
   const [savingComp, setSavingComp] = useState(false);
   const [nukiBusy, setNukiBusy] = useState(null as string | null); // 누끼 처리 중인 레이어 id
+  const [assetMsg, setAssetMsg] = useState(""); // 기본 에셋 생성 진행 메시지
+  // 컴포넌트 저장 이름 입력 모달 (window.prompt 대신 — 임베디드 환경에서도 동작)
+  const [saveModal, setSaveModal] = useState({ open: false, kind: "card", layerId: null as string | null, name: "" });
+
+  // ✏️ 리치 편집: 카드를 열면(주차 변경 포함) 기본 장식 그림·꾸밈 에셋을 자동 생성→캐시.
+  //  - 캐시에 있으면 즉시(과금 0). 없으면 한 번 생성 후 캐시(이후 재사용).
+  //  - 사용자가 이미 채운 슬롯(src 존재)은 덮어쓰지 않는다.
+  useEffect(() => {
+    if (!richEdit) return;
+    let cancelled = false;
+    const wk = monthPlanPoster.weeks[weekIndex % monthPlanPoster.weeks.length];
+    // (슬롯ids, 디스크립터) 목록
+    const jobs: { slotIds: string[]; d: ReturnType<typeof descriptorFor> }[] = [
+      ...(wk.illos || []).slice(0, 2).map((kind, i) => ({ slotIds: [`illo-${i + 1}`], d: descriptorFor("illustration", kind) })),
+      { slotIds: ["deco-1", "deco-2"], d: descriptorFor("decoration", "corner-sparkle") },
+    ];
+    const missing = jobs.filter((j) => !getCachedAsset(j.d));
+    if (!missing.length) return; // 모두 캐시됨 — 생성 불필요
+    const fill = (slotIds: string[], src: string) =>
+      setLayers((ls) => ls.map((l) => (slotIds.includes(l.id) && !l.src ? { ...l, src, style: { ...l.style, fit: "contain", background: "transparent" } } : l)));
+    (async () => {
+      for (let i = 0; i < missing.length; i++) {
+        if (cancelled) return;
+        setAssetMsg(`기본 디자인 생성 중… (${i + 1}/${missing.length}) · 처음 한 번만, 이후 캐시`);
+        try {
+          const { src } = await getAsset(missing[i].d);
+          if (cancelled) return;
+          fill(missing[i].slotIds, src);
+        } catch (e) {
+          console.warn("에셋 생성 실패:", missing[i].d.key, e);
+        }
+      }
+      if (!cancelled) setAssetMsg("");
+    })();
+    return () => { cancelled = true; };
+  }, [richEdit, weekIndex]);
 
   // 월안 이미지(업로드 포스터 또는 🗓️ 생성한 월안 포스터)에서 영역 선택
   const openRegionSelect = () => {
@@ -321,6 +317,24 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     }
   };
 
+  const [placing, setPlacing] = useState(false);
+  // 이 카드를 PNG 로 캡처해 보드 위에 이미지 아이템으로 올림
+  const placeOnBoard = async () => {
+    if (!stageRef.current || !onPlaceOnBoard) return;
+    setPlacing(true);
+    setSelectedId(null);
+    try {
+      await new Promise((r) => setTimeout(r, 60));
+      const src = await exportNodeToPng(stageRef.current, { width: 1280, backgroundColor: undefined, download: false, cacheBust: false });
+      const w = 520, h = Math.round((w * cardCanvas.h) / cardCanvas.w);
+      onPlaceOnBoard(src, { w, h });
+    } catch (e) {
+      console.warn("보드에 올리기 실패:", e);
+    } finally {
+      setPlacing(false);
+    }
+  };
+
   const exportPng = async () => {
     if (!stageRef.current) return;
     setExporting(true);
@@ -335,15 +349,27 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     }
   };
 
-  // 현재 디자인을 "컴포넌트"로 저장 (썸네일 포함)
-  const saveCurrentComponent = async () => {
-    const name = window.prompt("컴포넌트 이름", template.name) || "";
-    if (!name.trim()) return;
+  // 저장 모달 열기 (이름 입력) — window.prompt 대신 인라인 입력
+  const saveCurrentComponent = () => setSaveModal({ open: true, kind: "card", layerId: null, name: template.name });
+
+  // 모달에서 "저장" — kind 에 따라 카드 전체 / 단일 요소 저장
+  const confirmSaveModal = async () => {
+    const name = saveModal.name.trim();
+    if (!name) return;
+    const { kind, layerId } = saveModal;
+    setSaveModal((m) => ({ ...m, open: false }));
+    if (kind === "asset") {
+      const layer = layers.find((l) => l.id === layerId);
+      if (!layer || !layer.src) return;
+      const single: EditableLayer = { ...JSON.parse(JSON.stringify(layer)), id: "el-0", x: 0, y: 0 };
+      setComponents(saveComponent({ name, kind: "asset", canvas: { w: layer.width, h: layer.height }, layers: [single], thumb: layer.src }));
+      return;
+    }
+    // 카드 전체 (썸네일 포함)
     setSavingComp(true);
     setSelectedId(null);
     try {
-      await new Promise((r) => setTimeout(r, 60)); // 선택 해제 반영 (rAF 는 백그라운드 탭에서 멈춤)
-      // 썸네일은 "있으면 좋은" 것 — toPng 가 느리거나 멈춰도 저장은 항상 진행되도록 타임아웃 경쟁.
+      await new Promise((r) => setTimeout(r, 60));
       let thumb: string | undefined;
       try {
         if (stageRef.current) {
@@ -354,7 +380,7 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
       } catch (e) {
         console.warn("썸네일 생성 실패 — 썸네일 없이 저장:", e);
       }
-      setComponents(saveComponent({ name: name.trim(), canvas: cardCanvas, layers, thumb }));
+      setComponents(saveComponent({ name, kind: "card", canvas: cardCanvas, layers, thumb }));
     } finally {
       setSavingComp(false);
     }
@@ -363,12 +389,33 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
   const loadComponentToCanvas = (id: string) => {
     const c = components.find((x) => x.id === id);
     if (!c) return;
+    // 단일 요소(asset): 카드 교체 X — 선택한 이미지 슬롯에 채우거나, 없으면 새 레이어로 추가.
+    if (c.kind === "asset" && c.layers[0]) {
+      const a = c.layers[0];
+      const sel = layers.find((l) => l.id === selectedId);
+      if (sel && sel.type === "image") {
+        updateLayer(sel.id, { src: a.src, style: { ...sel.style, ...a.style } });
+      } else {
+        const nl: EditableLayer = { ...JSON.parse(JSON.stringify(a)), id: `el-${Date.now().toString(36)}`, x: Math.round((cardCanvas.w - a.width) / 2), y: Math.round((cardCanvas.h - a.height) / 2) };
+        setLayers((ls) => [...ls, nl]);
+        setSelectedId(nl.id);
+      }
+      return;
+    }
+    // 카드 전체 교체
     setLayers(JSON.parse(JSON.stringify(c.layers)));
     setCardCanvas(c.canvas);
     setSelectedId(null);
     setGenByLayer({});
     setCropReference(null);
     setCapturedPhotos([]);
+  };
+
+  // 선택한 요소(이미지 레이어)를 "컴포넌트"로 저장 — 모달로 이름 입력
+  const saveAssetComponent = (layerId: string) => {
+    const layer = layers.find((l) => l.id === layerId);
+    if (!layer || !layer.src) return;
+    setSaveModal({ open: true, kind: "asset", layerId, name: layer.name || "요소" });
   };
 
   // 누끼: 선택한 이미지 레이어의 배경을 투명하게 (투명 배경으로 카드에 자연스럽게 올림)
@@ -464,6 +511,13 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
           </div>
         )}
 
+        {/* 기본 디자인 에셋 생성 진행 */}
+        {assetMsg && (
+          <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "#efeafc", border: "1px solid #d8cff2", color: "#5B53A8", fontSize: 12.5, fontWeight: 700 }}>
+            🎨 {assetMsg}
+          </div>
+        )}
+
         {/* 내 컴포넌트 (저장한 디자인 — 클릭하면 캔버스로 불러오기) */}
         {components.length > 0 && (
           <div style={{ marginBottom: 12 }}>
@@ -478,7 +532,7 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
                   >
                     <div style={{ width: "100%", height: 80, background: "#f4efe8", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {c.thumb ? (
-                        <img src={c.thumb} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                        <img src={c.thumb} alt={c.name} style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", display: "block" }} />
                       ) : (
                         <span style={{ fontSize: 22 }}>🧩</span>
                       )}
@@ -502,6 +556,7 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
               genState={selectedId ? genByLayer[selectedId] : undefined}
               onRemoveBackground={removeBg}
               nukiBusy={nukiBusy === selectedId}
+              onSaveAsset={saveAssetComponent}
             />
           </div>
         </div>
@@ -522,6 +577,18 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
             {anyLoading ? "생성 중…" : "🤖 작품 사진 생성(3장)"}
           </button>
         )}
+        {onApply && (
+          <button onClick={() => onApply({ canvas: cardCanvas, layers })} title="편집 내용을 보드의 카드에 반영"
+            style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: "#E8862B", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(232,134,43,0.4)" }}>
+            ✅ 보드에 반영
+          </button>
+        )}
+        {onPlaceOnBoard && !onApply && (
+          <button onClick={placeOnBoard} disabled={placing} title="이 카드를 이미지로 보드 위에 올리기"
+            style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: placing ? "#7fbf95" : "#4f9d69", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(79,157,105,0.4)" }}>
+            {placing ? "올리는 중…" : "🧷 보드에 올리기"}
+          </button>
+        )}
         <button onClick={saveCurrentComponent} disabled={savingComp} title="현재 디자인을 컴포넌트로 저장(브라우저에 보관 · 재사용/재편집)"
           style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: savingComp ? "#9a93d6" : "#5B53A8", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(91,83,168,0.4)" }}>
           {savingComp ? "저장 중…" : "💾 컴포넌트로 저장"}
@@ -533,6 +600,33 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
       </div>
 
       {cropOpen && <RegionCropper imageSrc={cropImage} onCrop={onCropped} onClose={() => setCropOpen(false)} />}
+
+      {/* 컴포넌트 저장 이름 입력 모달 (window.prompt 대체) */}
+      {saveModal.open && (
+        <div
+          onMouseDown={() => setSaveModal((m) => ({ ...m, open: false }))}
+          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(40,36,32,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div onMouseDown={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 20, width: 320, boxShadow: "0 10px 40px rgba(0,0,0,0.25)" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#3f3833", marginBottom: 4 }}>
+              {saveModal.kind === "asset" ? "요소를 컴포넌트로 저장" : "카드를 컴포넌트로 저장"}
+            </div>
+            <div style={{ fontSize: 12, color: "#8a8078", marginBottom: 10 }}>이름을 입력하세요.</div>
+            <input
+              autoFocus
+              value={saveModal.name}
+              onChange={(e) => setSaveModal((m) => ({ ...m, name: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmSaveModal(); if (e.key === "Escape") setSaveModal((m) => ({ ...m, open: false })); }}
+              placeholder="컴포넌트 이름"
+              style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", border: "1px solid #d8c9bb", borderRadius: 8, fontSize: 14, marginBottom: 14 }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setSaveModal((m) => ({ ...m, open: false }))} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #d8c9bb", background: "#fff", color: "#3f3833", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>취소</button>
+              <button onClick={confirmSaveModal} disabled={!saveModal.name.trim()} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: saveModal.name.trim() ? "#5B53A8" : "#b8b2d8", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>저장</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

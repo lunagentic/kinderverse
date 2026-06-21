@@ -35,10 +35,11 @@ export interface WeekCardEditorProps {
   onSelect?: (id: string | null) => void;
   onUpdateLayer?: (id: string, patch: Partial<EditableLayer>) => void;
   width?: number; // 표시 너비 (캔버스는 비율 유지하여 스케일)
+  readOnly?: boolean; // 보드 미리보기: 내부 상호작용 비활성(클릭/드래그는 보드로 전달)
 }
 
 const WeekCardEditor = forwardRef(function WeekCardEditor(
-  { template, selectedId = null, onSelect, onUpdateLayer, width = 540 }: WeekCardEditorProps,
+  { template, selectedId = null, onSelect, onUpdateLayer, width = 540, readOnly = false }: WeekCardEditorProps,
   ref: React.Ref<HTMLDivElement>
 ) {
   const scale = width / template.canvas.w;
@@ -54,20 +55,27 @@ const WeekCardEditor = forwardRef(function WeekCardEditor(
   const selectLayer = (id: string | null) => { setEditingId(null); select(id); }; // 선택 시 편집 종료
   const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
 
-  // 드래그 이동 (텍스트 제외 — 텍스트는 인라인 편집/속성패널 사용)
+  // 드래그 이동 — 이동 중엔 DOM transform 만 바꿔 부드럽게(리렌더 X), 놓을 때 state 커밋.
   const beginDrag = (e: React.MouseEvent, layer: EditableLayer) => {
     if (layer.locked) return;
     e.stopPropagation();
+    e.preventDefault();
     selectLayer(layer.id);
+    const el = e.currentTarget as HTMLElement;
     const startX = e.clientX, startY = e.clientY, ox = layer.x, oy = layer.y;
-    let moved = false;
+    let lastDX = 0, lastDY = 0, moved = false;
     const move = (ev: MouseEvent) => {
-      const dx = (ev.clientX - startX) / scale;
-      const dy = (ev.clientY - startY) / scale;
-      if (Math.abs(dx) + Math.abs(dy) > 1) moved = true;
-      if (moved) update(layer.id, { x: Math.round(ox + dx), y: Math.round(oy + dy) });
+      lastDX = ev.clientX - startX; // 화면 px
+      lastDY = ev.clientY - startY;
+      if (Math.abs(lastDX) + Math.abs(lastDY) > 2) moved = true;
+      if (moved && el) { el.style.transform = `translate(${lastDX}px, ${lastDY}px)`; el.style.zIndex = "30"; }
     };
-    const up = () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+    const up = () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      if (el) { el.style.transform = ""; el.style.zIndex = ""; }
+      if (moved) update(layer.id, { x: Math.round(ox + lastDX / scale), y: Math.round(oy + lastDY / scale) });
+    };
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
@@ -203,7 +211,10 @@ const WeekCardEditor = forwardRef(function WeekCardEditor(
         >
           <span
             style={
-              s.lineClamp
+              // 1줄: nowrap+ellipsis (html-to-image 가 -webkit-line-clamp 를 깨뜨려 PNG 글자 잘림 → nowrap 사용)
+              s.lineClamp === 1
+                ? { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }
+                : s.lineClamp
                 ? { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: s.lineClamp, overflow: "hidden", whiteSpace: "pre-wrap" }
                 : { whiteSpace: "pre-wrap" }
             }
@@ -295,7 +306,7 @@ const WeekCardEditor = forwardRef(function WeekCardEditor(
   return (
     <div
       ref={ref}
-      onMouseDown={() => selectLayer(null)}
+      onMouseDown={readOnly ? undefined : () => selectLayer(null)}
       style={{
         position: "relative",
         width,
@@ -306,6 +317,7 @@ const WeekCardEditor = forwardRef(function WeekCardEditor(
         boxShadow: "0 4px 24px rgba(0,0,0,0.12)",
         userSelect: "none",
         flexShrink: 0,
+        pointerEvents: readOnly ? "none" : undefined, // 미리보기: 내부 비활성 → 보드가 드래그/선택 처리
       }}
     >
       {template.layers.map(renderLayer)}

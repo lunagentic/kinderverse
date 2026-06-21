@@ -3,6 +3,8 @@ import Board from "./components/Board.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
 import RendererPreview from "./components/RendererPreview.jsx";
 import WeekCardBlueprintTest from "./pages/WeekCardBlueprintTest";
+import { buildPosterWeekCard, weekOverridesFromMonthly, RICH_W, RICH_H } from "./templates/buildPosterWeekCard";
+import { getAsset, getAssetSmart, descriptorFor } from "./utils/assetLibrary";
 import {
   renderMonthlyPlanTemplate,
   renderColorLabFromRaw,
@@ -143,6 +145,8 @@ function Workspace() {
   const [cardEditorOpen, setCardEditorOpen] = useState(false); // 주간 카드 편집기 인앱 오버레이
   const [editorAutoCrop, setEditorAutoCrop] = useState(false); // 열 때 크로퍼(영역 선택) 자동 오픈 여부
   const [editorRich, setEditorRich] = useState(false); // ✏️ 리치 편집: 월안 1주차를 똑같이 재현(편집 가능)
+  const [editingItemId, setEditingItemId] = useState(null); // 편집 중인 weekcard 보드 아이템
+  const [editorInitial, setEditorInitial] = useState(null); // 편집기 초기 template (보드 아이템에서 열 때)
   // 화면 좌표 = 보드 좌표 * zoom + pan
   const [viewport, setViewport] = useState({ panX: 0, panY: 0, zoom: 1 });
   const boardRef = useRef(null);
@@ -223,6 +227,46 @@ function Workspace() {
   const removeItem = useCallback((id) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
     setSelectedIds((prev) => prev.filter((x) => x !== id));
+  }, []);
+
+  // 🧩 → 같은 1주를 v3(LLM+레퍼런스) / v4(기준 강화) 두 버전으로 만들어 퀄리티 비교
+  const compareWeekCards = useCallback(async (monthly) => {
+    const ov0 = monthly ? (weekOverridesFromMonthly(monthly.data)[0] || null) : null;
+    const week = ov0 || { weekLabel: "1주", title: "여름의 시작", playNames: ["놀이 1", "놀이 2"], illos: ["sun"], decoKind: "corner-sparkle" };
+    const w = 360, h = Math.round((360 * RICH_H) / RICH_W);
+    const baseX = monthly ? monthly.x + monthly.w + 32 : 80;
+    const baseY = monthly ? monthly.y : 80;
+    // 포스터(인포그래픽) 이미지를 v3 스타일 레퍼런스로 사용
+    const ref = (itemsRef.current.find((it) => it.type === "infographic" && it.data?.src)?.data?.src) || null;
+    const v4o = { ...week, tag: "v4 · 기준 강화" };
+    const v3o = { ...week, tag: "v3 · LLM+레퍼런스" };
+    const cardV4 = { id: nextId(), type: "weekcard", data: { weekIndex: 0, override: v4o, template: buildPosterWeekCard(0, v4o) }, x: baseX, y: baseY, w, h };
+    const cardV3 = { id: nextId(), type: "weekcard", data: { weekIndex: 0, override: v3o, template: buildPosterWeekCard(0, v3o) }, x: baseX + w + 24, y: baseY, w, h };
+    setItems((prev) => [...prev, cardV4, cardV3]);
+    const decoKind = week.decoKind || "corner-sparkle";
+    // v4: 키워드 kind 클레이 + 꾸밈
+    try {
+      const kind = (week.illos && week.illos[0]) || "sun";
+      await getAsset(descriptorFor("illustration", kind));
+      await getAsset(descriptorFor("decoration", decoKind));
+      updateItemData(cardV4.id, { template: buildPosterWeekCard(0, v4o) });
+    } catch (e) { /* skip */ }
+    // v3: LLM이 놀이명 분석해 프롬프트 작성 + 포스터 레퍼런스 스타일
+    try {
+      const cacheId = String(week.title || "week").replace(/\s+/g, "").slice(0, 24);
+      const { src } = await getAssetSmart(cacheId, week.title, week.playNames || [], ref);
+      await getAsset(descriptorFor("decoration", decoKind));
+      updateItemData(cardV3.id, { template: buildPosterWeekCard(0, { ...v3o, illoSrc: src }) });
+    } catch (e) { /* skip */ }
+  }, [updateItemData]);
+
+  // weekcard 아이템 "편집하기" → 편집기를 그 아이템의 template/주차로 열기
+  const editCard = useCallback((item) => {
+    setEditingItemId(item.id);
+    setEditorInitial({ template: item.data?.template || null, week: item.data?.weekIndex || 0 });
+    setEditorRich(true);
+    setEditorAutoCrop(false);
+    setCardEditorOpen(true);
   }, []);
 
   // 최신 items / selectedIds 를 ref 로 추적 (키보드 핸들러용)
@@ -432,49 +476,11 @@ function Workspace() {
         onRemoveItem={removeItem}
         onMoveSelected={moveSelectedBy}
         onConvert={convertCard}
+        onEditCard={editCard}
+        onMakeWeekCard={compareWeekCards}
       />
-      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorAutoCrop(true); setEditorRich(false); setCardEditorOpen(true); }} />
-      {/* 보드 런처: 주간 카드 편집기 (인앱) + 편집 아이콘 */}
-      <div style={{ position: "fixed", left: 16, top: 16, zIndex: 900, display: "flex", gap: 8 }}>
-        <button
-          onClick={() => { setEditorAutoCrop(false); setEditorRich(false); setCardEditorOpen(true); }}
-          title="주간 카드 편집기를 보드 위에서 열기"
-          style={{
-            padding: "8px 14px",
-            borderRadius: 10,
-            border: "1px solid #d8c9bb",
-            background: "#fff",
-            color: "#5B53A8",
-            fontSize: 13,
-            fontWeight: 800,
-            cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
-          }}
-        >
-          🧩 주간 카드 편집기
-        </button>
-        <button
-          onClick={() => { setEditorAutoCrop(false); setEditorRich(true); setCardEditorOpen(true); }}
-          title="월안 1주차를 똑같이 재현해 편집"
-          aria-label="편집"
-          style={{
-            width: 38,
-            height: 38,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 10,
-            border: "1px solid #d8c9bb",
-            background: "#5B53A8",
-            color: "#fff",
-            fontSize: 16,
-            cursor: "pointer",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
-          }}
-        >
-          ✏️
-        </button>
-      </div>
+      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorAutoCrop(true); setEditorRich(false); setEditingItemId(null); setEditorInitial(null); setCardEditorOpen(true); }} />
+      {/* 주차 카드는 월안 카드의 🧩 버튼으로 생성합니다 (좌상단 런처 제거) */}
       {/* 모바일: 채팅 시트 열기/닫기 (데스크톱에선 숨김) */}
       <button
         className="mobile-chat-fab"
@@ -508,7 +514,22 @@ function Workspace() {
           >
             ← 보드로
           </button>
-          <WeekCardBlueprintTest autoCrop={editorAutoCrop} richEdit={editorRich} />
+          <WeekCardBlueprintTest
+            autoCrop={editorAutoCrop}
+            richEdit={editorRich}
+            initialTemplate={editorInitial?.template || null}
+            initialWeek={editorInitial?.week || 0}
+            onApply={editingItemId ? (template) => {
+              updateItemData(editingItemId, { template });
+              setCardEditorOpen(false);
+              setEditingItemId(null);
+              setEditorInitial(null);
+            } : undefined}
+            onPlaceOnBoard={(src, size) => {
+              addGenerated({ type: "image", data: { src, alt: "주차 카드" }, size });
+              setCardEditorOpen(false);
+            }}
+          />
         </div>
       )}
     </div>

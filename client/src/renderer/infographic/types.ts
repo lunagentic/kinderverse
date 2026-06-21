@@ -34,6 +34,7 @@ export interface InfographicWeek {
   week: string; // "1주차"
   title: string;
   shortSummary: string;
+  plays?: string[]; // 주차 놀이명 (WeekCard 용)
   imagePrompt: InfographicImagePrompt;
 }
 

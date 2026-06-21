@@ -66,16 +66,16 @@ export function buildPosterImagePrompt(plan) {
   const life = b.life_theme || b.lifeTheme || "";
   const age = b.age_band || b.ageBand || "";
   const period = b.period?.label || [b.period?.start_date, b.period?.end_date].filter(Boolean).join(" ~ ") || "";
+  const rationale = plan?.rationale?.summary || plan?.rationale?.text || "";
 
   const weeks = (plan?.weekly_flow || [])
     .slice(0, 5)
     .map((w, i) => {
       const sub = w.sub_theme || w.subTheme || `${i + 1}주차`;
       const plays = (w.play_ideas || w.plays || [])
-        .slice(0, 4)
         .map((p) => (typeof p === "string" ? p : p.title))
         .filter(Boolean)
-        .join(", ");
+        .join(", "); // 누락 없이 전부
       return `${i + 1}주차 "${sub}"${plays ? ` — 놀이명: ${plays}` : ""}`;
     })
     .join("\n  ");
@@ -85,18 +85,71 @@ export function buildPosterImagePrompt(plan) {
     .filter(Boolean)
     .join(" · ");
 
-  // gpt-image 용 "설명형" 프롬프트 (지시문 아님). 주차 구조 유지 + 작품(결과물) 중심.
+  // 추가 섹션 데이터 (교사의 기대 / 바깥놀이 / 안전 / 인성)
+  const expectations = (plan?.teacher_expectations || [])
+    .map((e) => (typeof e === "string" ? e : e.goal || e.expectation || e.text))
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(" · ");
+  const outdoor = (plan?.outdoor_and_physical_play || [])
+    .map((o) => (typeof o === "string" ? o : o.activity_name || o.activityName || o.title))
+    .filter(Boolean)
+    .slice(0, 5)
+    .join(", ");
+  const se = plan?.safety_education || {};
+  const safety = [se.play_safety, se.tool_safety, se.life_safety].filter(Boolean).join(" · ");
+  const ce = plan?.character_education || {};
+  const character = [ce.core_value, ce.practice_context].filter(Boolean).join(" — ");
+  const events = (plan?.events || [])
+    .map((e) => (typeof e === "string" ? e : [e.name, e.date].filter(Boolean).join(" ")))
+    .filter((x) => x && x !== "-")
+    .slice(0, 4)
+    .join(", ");
+  const hc = plan?.home_connection || {};
+  const home = [
+    hc.home_play && `놀이: ${hc.home_play}`,
+    hc.parent_question && `질문: ${hc.parent_question}`,
+    hc.recommended_picture_book && `추천도서: ${hc.recommended_picture_book}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const curriculum = (plan?.curriculum_links || [])
+    .map((c) => (typeof c === "string" ? c : c.area || c.category))
+    .filter(Boolean)
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 6)
+    .join(", ");
+  // 하단 푸터에 들어갈 보조 섹션(내용까지 — 누락/임의생성 방지). 가정연계·행사는 5주(빈칸 카드)면 제외.
+  const footerItems = [
+    curriculum && `교육과정 연계: ${curriculum}`,
+    expectations && `교사의 기대: ${expectations}`,
+    outdoor && `바깥놀이·신체활동: ${outdoor}`,
+    safety && `안전교육: ${safety}`,
+    character && `인성교육: ${character}`,
+    weekCount !== 5 && home && `가정 연계: ${home}`,
+    weekCount !== 5 && events && `이달의 행사: ${events}`,
+  ].filter(Boolean);
+
+  // gpt-image 용 "설명형" 프롬프트. 상단 히어로 + "예상 놀이 흐름" + 1~4주 2×2 그리드. 계획(예정) 어조.
   return [
-    `Create ONE polished, vertical (portrait) Korean kindergarten play-based MONTHLY PLAN POSTER — magazine / editorial style, warm, friendly and cohesive, suitable for classroom display and parent notices.`,
-    `Big colorful rounded Korean title at the top center: "${theme}".`,
-    headerInfo && `A small header info ribbon below the title: "${headerInfo}", plus one short friendly intro sentence.`,
-    `Show ${weekCount} weekly cards arranged neatly, each card with: a week badge, the play names, and especially a representative ARTIFACT/RESULT image — the things children actually make and create that week (crafts, drawings, color cards, collages, simple cooking results), plus a short caption.`,
-    `Weekly content:`,
-    `  ${weeks || "1주차 탐색 / 2주차 표현 / 3주차 요리 / 4주차 나눔"}`,
-    `Also include small bottom sections: 주요 놀이자료(materials), 가정 연계(family connection), 교사 TIP.`,
-    `Style: soft warm pastel palette, rounded section cards, cute but tasteful illustrations of children's play artifacts and gentle nature decorations, soft natural lighting, clean composition with generous whitespace, premium children's educational quality.`,
-    `Emphasize the play artifacts/results rather than only play scenes. Do NOT make it a plain table or spreadsheet.`,
-    `IMPORTANT: render all Korean text accurately, cleanly and clearly legible.`,
+    `Create ONE polished, vertical Korean kindergarten MONTHLY PLAN infographic poster — clean and modern, warm and friendly, soft pastel palette, rounded WHITE cards on a light background, generous whitespace. Premium preschool educational quality, suitable for classroom display and parent notices.`,
+    `TOP HERO (one compact rounded card with a SOFT COLORED background fill — a warm theme-color tint, e.g. soft yellow/orange for a summer theme, NOT plain white): on the LEFT a SMALL friendly CUT-OUT clay 3D icon (cleanly isolated, NO frame/box, soft drop shadow) representing "${theme}" (e.g., a smiling sun mascot — keep it small); on the RIGHT a big bold rounded Korean title "${theme}" in a DEEPER accent color of that tint, below it a small subtitle "${headerInfo || "연령 · 기간"}", and one short friendly intro sentence (plan/upcoming tone)${rationale ? ` summarizing: "${rationale}"` : ""}.`,
+    `Below the hero, a bold section heading "예상 놀이 흐름" with a small colorful accent (e.g. a short underline or leaf/sun motif beside it).`,
+    `FINAL DESIGN polish (cohesive, premium, magazine-quality):`,
+    `- HERO/title banner: a nicely balanced rounded colored banner with a subtle decorative frame or soft motif accents (tiny suns/leaves/dots in the theme color) around the edges; the title large, bold and clearly the focal point, well balanced with the cut-out mascot; gentle soft shadow.`,
+    `- WEEK cards: consistent rounded corners + a subtle matching-color accent (thin border or a small top accent bar in that week's color) + soft drop shadow; small tasteful corner decorations (dots/sparkles/leaves) in each week's color; even spacing and aligned text.`,
+    `- FOOTER: a cohesive row of compact chips/mini-cards sharing one style, each with a small rounded colored icon; aligned and tidy.`,
+    `- OVERALL: one harmonious pastel palette, consistent corner radius and spacing, generous whitespace, balanced composition. Clean and premium — decorative but NOT cluttered.`,
+    `Arrange the ${weekCount} weekly cards in a 2-COLUMN grid, filling left-to-right then top-to-bottom (4 weeks → 2x2; 5 weeks → 2x3 with the 5th card alone on its own bottom row). EACH weekly card has ITS OWN soft pastel BACKGROUND color — a DIFFERENT color family per week (1주 soft pink, 2주 mint green, 3주 lavender, 4주 peach, 5주 sky blue) — coordinated with its badge; TEXT IS THE FOCUS: (1) a SMALL CUT-OUT illustration depicting that week's PLAY activity AND the CHILDREN'S ARTWORK/creations from its play names (the things kids make & do: crafts, drawings, color cards, collages, simple cooking) — the subject is cleanly isolated with a soft drop shadow, NO rectangular frame/box/photo border, floating naturally like a sticker and may slightly overlap the card edge; keep it small/secondary (~1/4 of the card or less); (2) a small rounded PILL badge ("1주"~"5주") in that week's vivid color, next to a bold week TITLE in a DEEPER shade of the SAME week color; (3) the FULL list of play names as the MAIN content — show EVERY play name with NONE omitted, each on its own line as a clear bullet, in comfortably LARGE, bold, highly legible dark text. Give the play-name text area the most space in the card.`,
+    `Weekly content (use these EXACT week titles and ALL play names — do not omit, shorten, merge, or invent any play name):`,
+    `  ${weeks || "1주 여름의 시작 — 놀이명: 여름 날씨 알아보기, 여름의 색깔 찾기\n  2주 여름의 자연\n  3주 여름의 놀이\n  4주 여름의 예술"}`,
+    weekCount === 5 &&
+      `Because there are 5 weeks, the 2x3 grid has ONE empty cell next to the 5th week — fill that cell with a single rounded WHITE card (same style as the weekly cards) containing TWO compact stacked sections: (A) "가정 연계" (family connection) with a small home/heart icon and the text${home ? `: ${home}` : " (use the plan's home connection)"}; (B) "이달의 행사" (this month's events) with a small calendar/party icon and the text${events ? `: ${events}` : " (use the month's events)"}. Keep both tidy and clearly separated within the one card.`,
+    footerItems.length &&
+      `Below the grid, a compact footer area of small labeled cards/chips. Use EXACTLY this content for each label (do not omit any, do not invent):\n  ${footerItems.join("\n  ")}\nKeep the footer secondary and compact; the weekly grid stays the dominant visual.`,
+    `WORDING: this is a PLAN for the upcoming month. All Korean copy (intro, week titles, play-name captions) must use plan/upcoming tone — e.g. "~해요", "~하기", "~해 볼까요?". Do NOT use past tense like "~했어요"/"~했습니다". Generate captions from the listed play names.`,
+    `Style: soft warm pastel, rounded white container cards, cute tasteful illustrations centered on children's PLAY activities and the ARTWORK they create. ALL imagery is CUT-OUT / sticker style — subjects cleanly isolated with a soft drop shadow, NO rectangular photo frames or boxed images — placed to float and overlap naturally (not inside inner boxes). Soft natural lighting, clean GRID composition. Do NOT make it a plain table or spreadsheet.`,
+    `IMPORTANT: render all Korean text accurately and clearly legible. Keep the hero + 2-column weekly grid layout exactly as described.`,
   ]
     .filter(Boolean)
     .join("\n");

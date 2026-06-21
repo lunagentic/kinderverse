@@ -1,6 +1,6 @@
 // 개발용 스테이지 인스펙터: 월안 Template Renderer 파이프라인을 단계별로 확인.
 // URL ?render=monthly. 탭: Section Tree / Layer Tree / Layout.
-import { Component, useMemo, useState } from "react";
+import { Component, useMemo, useRef, useState } from "react";
 import { DesignFrame } from "./BoardItem.jsx";
 import {
   buildTemplateFromRaw,
@@ -14,7 +14,20 @@ import { normalizeMonthlyPlan } from "../renderer/normalize/monthlyPlan";
 import MonthlyDocumentRenderer from "../renderer/document/MonthlyDocumentRenderer";
 import { MonthlyInfographicRenderer } from "../renderer/infographic/MonthlyInfographicRenderer";
 import { buildInfographicData } from "../renderer/infographic/buildInfographicData";
+import { buildWeekCard, STYLE_PACKS, toInfographicStructure } from "../renderer/weekly/buildWeeklyTemplate";
+import { toPng } from "html-to-image";
 import sample from "../renderer/__fixtures__/monthlyPlan.sample.json";
+// 새 파이프라인: 색채연구소 데이터 → 변환 → 설계도 → 편집 템플릿 → 에디터
+import WeekCardEditor from "./WeekCardEditor";
+import LayerPanel from "./LayerPanel";
+import PropertyPanel from "./PropertyPanel";
+import { sampleMonthlyPlan } from "../data/sampleMonthlyPlan";
+import { transformMonthlyPlanToInfographic } from "../transformers/monthlyToInfographic";
+import { buildWeekCardBlueprint } from "../blueprints/buildWeekCardBlueprint";
+import { buildEditableWeekCardTemplate } from "../templates/buildEditableWeekCardTemplate";
+import { buildWeekCardImagePrompt } from "../prompts/buildImagePrompt";
+import { STYLE_PACKS as INFOGRAPHIC_PACKS, DEFAULT_STYLE_PACK } from "../styles/stylePacks";
+import { exportNodeToPng } from "../utils/exportToPng";
 
 // 편집(react-rnd) 경로 크래시 격리
 class Boundary extends Component {
@@ -433,12 +446,237 @@ function InfographicView({ sample }) {
   );
 }
 
+// ── WeekCard 편집 (월안 → InfographicStructure → StylePack → 편집 → PNG Export) ──
+function WeeklyTemplateView({ sample }) {
+  const vm = useMemo(() => normalizeMonthlyPlan(sample), [sample]);
+  const ig = useMemo(() => toInfographicStructure(vm), [vm]); // InfographicStructure
+  const weeks = ig.weeklyFlow.length || 4;
+  const [week, setWeek] = useState(0);
+  const [packId, setPackId] = useState(STYLE_PACKS[0].id);
+  const [edited, setEdited] = useState({});
+  const [exporting, setExporting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const stageRef = useRef(null);
+
+  const pack = STYLE_PACKS.find((p) => p.id === packId) || STYLE_PACKS[0];
+  const editKey = week + "-" + packId;
+  const baseDoc = useMemo(() => buildWeekCard(ig, week, pack), [ig, week, pack]);
+  const doc = edited[editKey] || baseDoc;
+  const onChange = (patch) => setEdited((p) => ({ ...p, [editKey]: { ...doc, ...patch } }));
+
+  // 배경색 수정 (페이지 배경 element + frame.bg 동시 변경)
+  const setBg = (color) =>
+    onChange({
+      frame: { ...doc.frame, bg: color },
+      elements: doc.elements.map((e) => (e.id === "page" ? { ...e, style: { ...e.style, bg: color } } : e)),
+    });
+  const BG_SWATCHES = ["#FBF7FB", "#F1FAF5", "#F2F4FF", "#FFFBF0", "#FFF6F2", "#EAF6FF", "#FFF0F4", "#F4F0FA"];
+
+  const STAGE_W = 540;
+  const scale = STAGE_W / doc.frame.w;
+  const stageH = Math.ceil(doc.frame.h * scale);
+
+  const exportPng = async () => {
+    setExporting(true);
+    // 편집 핸들/외곽선 없이(static) 캡처되도록 한 프레임 대기
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const node = stageRef.current?.querySelector(".dframe");
+    if (!node) { setExporting(false); return; }
+    try {
+      const url = await toPng(node, {
+        style: { transform: "none", transformOrigin: "top left", margin: "0" },
+        width: doc.frame.w,
+        height: doc.frame.h,
+        pixelRatio: 2,
+        backgroundColor: doc.frame.bg,
+        cacheBust: true,
+        skipFonts: true, // 외부(Google) 폰트 임베드 시도 → cross-origin 에러 방지
+      });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${doc.title || "주간템플릿"}.png`;
+      a.click();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      console.warn("PNG export 실패:", e);
+    }
+    setExporting(false);
+  };
+
+  const btn = (active) => ({
+    padding: "5px 12px",
+    borderRadius: 8,
+    border: "1px solid #d8c9bb",
+    background: active ? "#d97757" : "#fff",
+    color: active ? "#fff" : "#3f3833",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  });
+
+  return (
+    <div>
+      {/* 주차 선택 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {Array.from({ length: weeks }, (_, i) => (
+          <button key={i} onClick={() => setWeek(i)} style={btn(week === i)}>
+            {ig.weeklyFlow[i]?.week || `${i + 1}주차`}
+          </button>
+        ))}
+        <button
+          onClick={exportPng}
+          disabled={exporting}
+          style={{ ...btn(false), marginLeft: "auto", border: "none", background: saved ? "#4f9d69" : "#6a5acd", color: "#fff" }}
+        >
+          {exporting ? "내보내는 중…" : saved ? "저장됨 ✓" : "PNG 내보내기 ↓"}
+        </button>
+      </div>
+      {/* StylePack 선택 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: "#a99", fontSize: 11 }}>스타일팩</span>
+        {STYLE_PACKS.map((p) => (
+          <button
+            key={p.id}
+            onClick={() => setPackId(p.id)}
+            style={{ ...btn(packId === p.id), background: packId === p.id ? p.ink : "#fff", borderColor: p.ink, color: packId === p.id ? "#fff" : p.ink }}
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
+      {/* 배경색 수정 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: "#a99", fontSize: 11 }}>배경색</span>
+        {BG_SWATCHES.map((c) => (
+          <button
+            key={c}
+            onClick={() => setBg(c)}
+            title={c}
+            style={{ width: 22, height: 22, borderRadius: 6, border: doc.frame.bg === c ? "2px solid #d97757" : "1px solid #ddd", background: c, cursor: "pointer", padding: 0 }}
+          />
+        ))}
+        <span style={{ color: "#a99", fontSize: 11, marginLeft: 4 }}>· 텍스트=더블클릭, 이미지=클릭→패널 갤러리, 도형=클릭→색상</span>
+      </div>
+      <div
+        ref={stageRef}
+        style={{ width: STAGE_W, height: stageH, background: "#fff", borderRadius: 12, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", overflow: "visible" }}
+      >
+        <Boundary key={editKey + (exporting ? "-x" : "")}>
+          <DesignFrame data={doc} selected={!exporting} zoom={1} onChange={onChange} />
+        </Boundary>
+      </div>
+    </div>
+  );
+}
+
+// ── 카드 에디터 뷰 (색채연구소 → 편집 템플릿 → LayerPanel + Canvas + PropertyPanel) ──
+function CardEditorView() {
+  const build = (packId) => {
+    const ig = transformMonthlyPlanToInfographic(sampleMonthlyPlan);
+    const pack = INFOGRAPHIC_PACKS.find((p) => p.id === packId) || DEFAULT_STYLE_PACK;
+    const week = ig.weeks[0];
+    const bp = buildWeekCardBlueprint(week, pack);
+    return { tpl: buildEditableWeekCardTemplate(bp, week), prompt: buildWeekCardImagePrompt(bp, week) };
+  };
+  const [packId, setPackId] = useState(DEFAULT_STYLE_PACK.id);
+  const [built, setBuilt] = useState(() => build(DEFAULT_STYLE_PACK.id));
+  const [layers, setLayers] = useState(() => built.tpl.layers);
+  const [selectedId, setSelectedId] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const stageRef = useRef(null);
+
+  const exportPng = async () => {
+    if (!stageRef.current) return;
+    setExporting(true);
+    setSelectedId(null); // 편집 chrome(아웃라인/입력창) 제거 후 캡처
+    // 선택 해제 반영을 위해 두 프레임 대기
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      await exportNodeToPng(stageRef.current, {
+        fileName: built.tpl.name,
+        width: 1200,
+        backgroundColor: template.background.color,
+      });
+    } catch (e) {
+      console.warn("PNG 저장 실패:", e);
+    }
+    setExporting(false);
+  };
+
+  const choosePack = (id) => {
+    setPackId(id);
+    const b = build(id);
+    setBuilt(b);
+    setLayers(b.tpl.layers);
+    setSelectedId(null);
+  };
+  const updateLayer = (id, patch) =>
+    setLayers((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const template = { ...built.tpl, layers };
+  const selected = layers.find((l) => l.id === selectedId) || null;
+
+  const btn = (active) => ({
+    padding: "5px 12px",
+    borderRadius: 8,
+    border: "1px solid #d8c9bb",
+    background: active ? "#d97757" : "#fff",
+    color: active ? "#fff" : "#3f3833",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ color: "#a99", fontSize: 11 }}>스타일팩</span>
+        {INFOGRAPHIC_PACKS.map((p) => (
+          <button key={p.id} onClick={() => choosePack(p.id)} style={btn(packId === p.id)}>
+            {p.name}
+          </button>
+        ))}
+        <button onClick={() => setShowPrompt((v) => !v)} style={{ ...btn(showPrompt), marginLeft: "auto" }}>
+          {showPrompt ? "프롬프트 숨기기" : "이미지 프롬프트 보기"}
+        </button>
+        <button onClick={exportPng} disabled={exporting} style={{ ...btn(false), border: "none", background: "#6a5acd", color: "#fff" }}>
+          {exporting ? "저장 중…" : "PNG로 저장 ↓"}
+        </button>
+      </div>
+      {showPrompt && (
+        <pre style={{ whiteSpace: "pre-wrap", background: "#fff", border: "1px solid #e6ddd2", borderRadius: 8, padding: 12, fontSize: 12, lineHeight: 1.6, color: "#4a423b", marginBottom: 12 }}>
+          {built.prompt}
+        </pre>
+      )}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <div style={{ width: 210, flexShrink: 0 }}>
+          <LayerPanel layers={layers} selectedId={selectedId} onSelect={setSelectedId} />
+        </div>
+        <WeekCardEditor
+          ref={stageRef}
+          template={template}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onUpdateLayer={updateLayer}
+          width={460}
+        />
+        <div style={{ width: 230, flexShrink: 0 }}>
+          <PropertyPanel layer={selected} onUpdateLayer={updateLayer} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   { key: "section", label: "① Section Tree" },
   { key: "layer", label: "② Layer Tree" },
   { key: "layout", label: "③ Layout" },
   { key: "document", label: "④ 문서" },
   { key: "infographic", label: "⑤ 인포그래픽" },
+  { key: "weekly", label: "⑥ 주간 템플릿" },
+  { key: "editor", label: "⑦ 카드 에디터" },
 ];
 
 export default function RendererPreview() {
@@ -476,7 +714,7 @@ export default function RendererPreview() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div style={{ maxWidth: tab === "editor" ? 980 : 760, margin: "0 auto" }}>
         <h2 style={{ margin: "0 0 4px", color: "#3f3833", fontSize: 18 }}>
           월안 Template Renderer — 스테이지 인스펙터
         </h2>
@@ -519,6 +757,16 @@ export default function RendererPreview() {
         {tab === "infographic" && (
           <Boundary>
             <InfographicView sample={sample} />
+          </Boundary>
+        )}
+        {tab === "weekly" && (
+          <Boundary>
+            <WeeklyTemplateView sample={sample} />
+          </Boundary>
+        )}
+        {tab === "editor" && (
+          <Boundary>
+            <CardEditorView />
           </Boundary>
         )}
       </div>

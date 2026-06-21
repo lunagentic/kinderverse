@@ -66,6 +66,7 @@ export function buildInfographicData(vm: MonthlyPlanViewModel): MonthlyInfograph
       week: `${w.week}주차`,
       title: w.subTheme || `${w.week}주차 놀이`,
       shortSummary: summary,
+      plays: (w.plays || []).map((p) => p.title).filter(Boolean),
       imagePrompt: buildImagePrompt(
         `${w.week}주차 ${w.subTheme || ""} 이미지`.trim(),
         `A premium educational illustration for week ${w.week} "${w.subTheme || theme}", ${sceneFor(w.subTheme || theme)}`,

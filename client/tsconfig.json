@@ -12,5 +12,5 @@
     "allowJs": false,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/renderer"]
+  "include": ["src/renderer", "src/data", "src/transformers", "src/blueprints", "src/styles", "src/prompts", "src/templates"]
 }

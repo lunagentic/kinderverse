@@ -130,3 +130,42 @@ export async function generateImage(prompt, opts = {}) {
     return null;
   }
 }
+
+// ── 레퍼런스 이미지 컨디셔닝 (image-to-image, /images/edits) ──
+// 레퍼런스(기준) 이미지의 그림체/분위기에 맞춰 새 이미지를 생성한다.
+// 성공 시 { dataUrl, model }, 실패/미지원 시 null → 호출부가 일반 생성으로 폴백.
+export async function generateImageWithReference(prompt, referenceDataUrl, opts = {}) {
+  if (!canGenerateImage()) return null;
+  if (!referenceDataUrl || typeof referenceDataUrl !== "string") return null;
+  const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+  // edits 지원 모델 (env 로 override 가능). 기본은 이미지 모델, 안되면 gpt-image-1.
+  const model = process.env.OPENAI_IMAGE_EDIT_MODEL || process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+  const size = opts.size || process.env.OPENAI_IMAGE_SIZE || "1024x1024";
+  try {
+    const b64 = referenceDataUrl.split(",")[1];
+    if (!b64) return null;
+    const buffer = Buffer.from(b64, "base64");
+    const form = new FormData();
+    form.append("model", model);
+    form.append("prompt", prompt);
+    form.append("size", size);
+    form.append("image", new Blob([buffer], { type: "image/png" }), "reference.png");
+    const res = await fetch(`${base}/images/edits`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, // content-type 은 FormData 가 설정
+      body: form,
+    });
+    if (!res.ok) {
+      console.warn(`[kinderverse] 이미지(edits) ${res.status} — 일반 생성으로 폴백`);
+      return null;
+    }
+    const data = await res.json();
+    const item = data?.data?.[0];
+    if (item?.b64_json) return { dataUrl: `data:image/png;base64,${item.b64_json}`, model };
+    if (item?.url) return { dataUrl: item.url, model };
+    return null;
+  } catch (err) {
+    console.warn("[kinderverse] 이미지(edits) 실패 — 일반 생성으로 폴백:", err.message);
+    return null;
+  }
+}

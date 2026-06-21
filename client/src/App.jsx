@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Board from "./components/Board.jsx";
 import ChatPanel from "./components/ChatPanel.jsx";
 import RendererPreview from "./components/RendererPreview.jsx";
+import WeekCardBlueprintTest from "./pages/WeekCardBlueprintTest";
 import {
   renderMonthlyPlanTemplate,
   renderColorLabFromRaw,
@@ -44,6 +45,11 @@ function combineDocs(docs, labels) {
 const RENDER_PREVIEW =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("render") === "monthly";
+
+// 개발용 진입점: ?render=weekcard → 1주차 WeekCard 설계도 테스트 페이지
+const WEEKCARD_TEST =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("render") === "weekcard";
 
 let idCounter = 1;
 // 카운터 + 랜덤 접미사 → HMR/리로드로 카운터가 리셋돼도 기존 아이템과 ID 충돌 방지
@@ -116,6 +122,7 @@ function cardToContent(item) {
 }
 
 export default function App() {
+  if (WEEKCARD_TEST) return <WeekCardBlueprintTest />;
   if (RENDER_PREVIEW) return <RendererPreview />;
   return <Workspace />;
 }
@@ -133,6 +140,9 @@ function Workspace() {
   }, []);
   const clipboard = useRef([]);
   const [chatOpen, setChatOpen] = useState(false); // 모바일 채팅 시트 토글
+  const [cardEditorOpen, setCardEditorOpen] = useState(false); // 주간 카드 편집기 인앱 오버레이
+  const [editorAutoCrop, setEditorAutoCrop] = useState(false); // 열 때 크로퍼(영역 선택) 자동 오픈 여부
+  const [editorRich, setEditorRich] = useState(false); // ✏️ 리치 편집: 월안 1주차를 똑같이 재현(편집 가능)
   // 화면 좌표 = 보드 좌표 * zoom + pan
   const [viewport, setViewport] = useState({ panX: 0, panY: 0, zoom: 1 });
   const boardRef = useRef(null);
@@ -423,7 +433,48 @@ function Workspace() {
         onMoveSelected={moveSelectedBy}
         onConvert={convertCard}
       />
-      <ChatPanel onGenerate={addGenerated} />
+      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorAutoCrop(true); setEditorRich(false); setCardEditorOpen(true); }} />
+      {/* 보드 런처: 주간 카드 편집기 (인앱) + 편집 아이콘 */}
+      <div style={{ position: "fixed", left: 16, top: 16, zIndex: 900, display: "flex", gap: 8 }}>
+        <button
+          onClick={() => { setEditorAutoCrop(false); setEditorRich(false); setCardEditorOpen(true); }}
+          title="주간 카드 편집기를 보드 위에서 열기"
+          style={{
+            padding: "8px 14px",
+            borderRadius: 10,
+            border: "1px solid #d8c9bb",
+            background: "#fff",
+            color: "#5B53A8",
+            fontSize: 13,
+            fontWeight: 800,
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+          }}
+        >
+          🧩 주간 카드 편집기
+        </button>
+        <button
+          onClick={() => { setEditorAutoCrop(false); setEditorRich(true); setCardEditorOpen(true); }}
+          title="월안 1주차를 똑같이 재현해 편집"
+          aria-label="편집"
+          style={{
+            width: 38,
+            height: 38,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 10,
+            border: "1px solid #d8c9bb",
+            background: "#5B53A8",
+            color: "#fff",
+            fontSize: 16,
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
+          }}
+        >
+          ✏️
+        </button>
+      </div>
       {/* 모바일: 채팅 시트 열기/닫기 (데스크톱에선 숨김) */}
       <button
         className="mobile-chat-fab"
@@ -433,6 +484,33 @@ function Workspace() {
         {chatOpen ? "✕" : "💬 채팅"}
       </button>
       {chatOpen && <div className="mobile-chat-backdrop" onClick={() => setChatOpen(false)} />}
+
+      {/* 주간 카드 편집기 — 보드 위 인앱 오버레이 (새 탭 없이 테스트) */}
+      {cardEditorOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "#efe9e0", overflow: "auto" }}>
+          <button
+            onClick={() => setCardEditorOpen(false)}
+            style={{
+              position: "fixed",
+              right: 16,
+              top: 16,
+              zIndex: 2100,
+              padding: "8px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: "#3f3833",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+            }}
+          >
+            ← 보드로
+          </button>
+          <WeekCardBlueprintTest autoCrop={editorAutoCrop} richEdit={editorRich} />
+        </div>
+      )}
     </div>
   );
 }

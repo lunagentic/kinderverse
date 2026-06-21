@@ -19,13 +19,14 @@ for (const envPath of [join(__dirname, "..", ".env"), join(__dirname, ".env")]) 
 
 const { generateItem, convertItem, generateInfographicPoster } = await import("./generate.js");
 const { activeProvider } = await import("./prompts/index.js");
+const { generateImage, generateImageWithReference } = await import("./prompts/llm.js");
 const app = express();
 // 프로덕션(호스팅)은 PORT 를 주입받아 사용.
 // 개발 프리뷰에서는 클라이언트(vite)가 PORT 를 쓰므로 서버는 API_PORT 로 분리(충돌 방지).
 const isProd = process.env.NODE_ENV === "production";
 const PORT = process.env.API_PORT || (isProd ? process.env.PORT : undefined) || 3001;
 
-app.use(express.json());
+app.use(express.json({ limit: "16mb" })); // 레퍼런스 이미지(dataURL) 전송 위해 한도 상향
 
 // --- API ---
 app.get("/api/health", (req, res) => {
@@ -71,6 +72,28 @@ app.post("/api/infographic", async (req, res) => {
     res.json({ src: poster?.src || null, model: poster?.model || null });
   } catch (err) {
     console.error("[verse] infographic error:", err);
+    res.json({ src: null });
+  }
+});
+
+// WeekCard 이미지 프롬프트 → gpt-image 1장. reference(dataURL) 있으면 그 그림체로 컨디셔닝(images/edits),
+// 없거나 edits 실패 시 일반 생성으로 폴백. 키없음/실패 시 src:null.
+app.post("/api/weekcard-image", async (req, res) => {
+  const prompt = (req.body?.prompt || "").trim();
+  if (!prompt) return res.status(400).json({ error: "prompt 가 필요합니다." });
+  const size = req.body?.size || "1024x1024";
+  const reference = req.body?.reference; // optional dataURL
+  try {
+    let img = null;
+    let usedReference = false;
+    if (reference) {
+      img = await generateImageWithReference(prompt, reference, { size });
+      usedReference = !!img;
+    }
+    if (!img) img = await generateImage(prompt, { size }); // 레퍼런스 미사용/실패 시 폴백
+    res.json({ src: img?.dataUrl || null, model: img?.model || null, usedReference });
+  } catch (err) {
+    console.error("[verse] weekcard-image error:", err);
     res.json({ src: null });
   }
 });

@@ -42,12 +42,33 @@ const ILLUSTRATION_SUBJECTS: Record<string, string> = {
   water: "a playful splash of blue water with droplets",
   leaf: "a couple of fresh green leaves",
   insect: "a cute friendly ladybug",
+  calendar: "a cute wall calendar",
+  puzzle: "a few colorful jigsaw puzzle pieces",
+  camera: "a cute toy camera",
+  drum: "a small toy drum",
+  icecream: "a cute ice cream cone",
+  // ── 기타(misc) ──
+  umbrella: "a cute summer parasol umbrella",
+  fan: "a cute hand fan",
+  hat: "a cute summer straw hat",
+  boat: "a cute little sailboat",
+  butterfly: "a cute butterfly",
+  frog: "a cute little frog",
+  bird: "a cute little bird",
+  kite: "a cute kite",
+  balloon: "a couple of cute balloons",
+  watering_can: "a cute watering can",
+  bucket: "a cute sand bucket with a shovel",
+  popsicle: "a cute popsicle",
+  cup: "a cute cup of fruit punch",
+  magnifier: "a cute magnifying glass",
 };
 
 // 꾸밈 요소(가장자리 장식) 묘사
 const DECORATION_SUBJECTS: Record<string, string> = {
   "corner-sparkle": "a small decorative cluster of one four-point sparkle star with a few tiny round dots around it",
   leaf: "a couple of small cute leaves",
+  flower: "a tiny cute single flower",
   dots: "a small scattered cluster of tiny round dots",
 };
 

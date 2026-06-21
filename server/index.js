@@ -105,12 +105,14 @@ app.post("/api/icon-prompt", async (req, res) => {
   if (!hasLLM || !hasLLM()) return res.json({ subject: null });
   try {
     const system =
-      "You design a single cute 3D clay (claymation) kindergarten icon for a Korean weekly play theme. " +
-      'Reply ONLY as JSON: {"subject":"..."}. The subject is a short English phrase (3-12 words) describing the ONE most ' +
-      "representative concrete object (or small group) for the theme. No style words, no quotes inside.";
+      "You design ONE cute 3D clay (claymation) kindergarten illustration for a Korean weekly play theme. " +
+      "COMBINE all the week's play activities into a SINGLE cohesive scene/object that visibly includes the key concrete things " +
+      "from each activity together (e.g., calendar + flower → 'a wall calendar with a blooming flower'). " +
+      'Reply ONLY as JSON: {"subject":"..."}. Subject = short English phrase (4-16 words) naming the combined concrete objects. ' +
+      "No style words, no quotes inside.";
     const user =
       `주제(theme): ${theme}\n놀이명(play activities): ${plays.join(", ")}\n` +
-      `Return the best single clay object subject for preschoolers as JSON {"subject":"..."}. English subject only.`;
+      `Combine these activities into ONE clay scene for preschoolers. Return JSON {"subject":"..."}, English subject only.`;
     const out = await callLLM({ system, user });
     const subject = (out && typeof out.subject === "string" ? out.subject : "").trim().replace(/^["'`]+|["'`]+$/g, "").slice(0, 140);
     res.json({ subject: subject || null });

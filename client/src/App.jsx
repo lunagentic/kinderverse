@@ -143,7 +143,6 @@ function Workspace() {
   const clipboard = useRef([]);
   const [chatOpen, setChatOpen] = useState(false); // 모바일 채팅 시트 토글
   const [cardEditorOpen, setCardEditorOpen] = useState(false); // 주간 카드 편집기 인앱 오버레이
-  const [editorAutoCrop, setEditorAutoCrop] = useState(false); // 열 때 크로퍼(영역 선택) 자동 오픈 여부
   const [editorRich, setEditorRich] = useState(false); // ✏️ 리치 편집: 월안 1주차를 똑같이 재현(편집 가능)
   const [editingItemId, setEditingItemId] = useState(null); // 편집 중인 weekcard 보드 아이템
   const [editorInitial, setEditorInitial] = useState(null); // 편집기 초기 template (보드 아이템에서 열 때)
@@ -229,35 +228,44 @@ function Workspace() {
     setSelectedIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
-  // 🧩 → 같은 1주를 v3(LLM+레퍼런스) / v4(기준 강화) 두 버전으로 만들어 퀄리티 비교
-  const compareWeekCards = useCallback(async (monthly) => {
-    const ov0 = monthly ? (weekOverridesFromMonthly(monthly.data)[0] || null) : null;
-    const week = ov0 || { weekLabel: "1주", title: "여름의 시작", playNames: ["놀이 1", "놀이 2"], illos: ["sun"], decoKind: "corner-sparkle" };
+  // 🧩 → 그 월안의 1·2주 카드 생성. 각 카드 그림 = 놀이명들을 "한 장면으로 조합한" LLM 그림(포스터 스타일 레퍼런스).
+  const placeWeekCardsFrom = useCallback(async (monthly) => {
+    const overrides = monthly ? weekOverridesFromMonthly(monthly.data) : [];
+    const weeks = (overrides.length ? overrides : [null]).slice(0, 2); // 1주 & 2주
     const w = 360, h = Math.round((360 * RICH_H) / RICH_W);
     const baseX = monthly ? monthly.x + monthly.w + 32 : 80;
     const baseY = monthly ? monthly.y : 80;
-    // 포스터(인포그래픽) 이미지를 v3 스타일 레퍼런스로 사용
     const ref = (itemsRef.current.find((it) => it.type === "infographic" && it.data?.src)?.data?.src) || null;
-    const v4o = { ...week, tag: "v4 · 기준 강화" };
-    const v3o = { ...week, tag: "v3 · LLM+레퍼런스" };
-    const cardV4 = { id: nextId(), type: "weekcard", data: { weekIndex: 0, override: v4o, template: buildPosterWeekCard(0, v4o) }, x: baseX, y: baseY, w, h };
-    const cardV3 = { id: nextId(), type: "weekcard", data: { weekIndex: 0, override: v3o, template: buildPosterWeekCard(0, v3o) }, x: baseX + w + 24, y: baseY, w, h };
-    setItems((prev) => [...prev, cardV4, cardV3]);
-    const decoKind = week.decoKind || "corner-sparkle";
-    // v4: 키워드 kind 클레이 + 꾸밈
-    try {
-      const kind = (week.illos && week.illos[0]) || "sun";
-      await getAsset(descriptorFor("illustration", kind));
-      await getAsset(descriptorFor("decoration", decoKind));
-      updateItemData(cardV4.id, { template: buildPosterWeekCard(0, v4o) });
-    } catch (e) { /* skip */ }
-    // v3: LLM이 놀이명 분석해 프롬프트 작성 + 포스터 레퍼런스 스타일
-    try {
-      const cacheId = String(week.title || "week").replace(/\s+/g, "").slice(0, 24);
-      const { src } = await getAssetSmart(cacheId, week.title, week.playNames || [], ref);
-      await getAsset(descriptorFor("decoration", decoKind));
-      updateItemData(cardV3.id, { template: buildPosterWeekCard(0, { ...v3o, illoSrc: src }) });
-    } catch (e) { /* skip */ }
+    const created = weeks.map((ov, i) => ({
+      id: nextId(), type: "weekcard",
+      data: { weekIndex: i, override: ov || null, template: buildPosterWeekCard(i, ov || undefined) },
+      x: baseX + i * (w + 24), y: baseY, w, h,
+    }));
+    setItems((prev) => [...prev, ...created]);
+    for (let i = 0; i < weeks.length; i++) {
+      const ov = weeks[i];
+      const decoKind = (ov && ov.decoKind) || "corner-sparkle";
+      try {
+        if (ov) {
+          // 놀이명들을 조합한 LLM 그림 1개
+          const cacheId = String(ov.title || `week${i}`).replace(/\s+/g, "").slice(0, 24);
+          const { src } = await getAssetSmart(cacheId, ov.title, ov.playNames || [], ref);
+          await getAsset(descriptorFor("decoration", decoKind));
+          updateItemData(created[i].id, { template: buildPosterWeekCard(i, { ...ov, illoSrc: src }) });
+        } else {
+          await getAsset(descriptorFor("illustration", "sun"));
+          updateItemData(created[i].id, { template: buildPosterWeekCard(i, undefined) });
+        }
+      } catch (e) {
+        // LLM/생성 실패 → 키워드 kind 폴백
+        try {
+          const k = (ov && ov.illos && ov.illos[0]) || "sun";
+          await getAsset(descriptorFor("illustration", k));
+          await getAsset(descriptorFor("decoration", decoKind));
+          updateItemData(created[i].id, { template: buildPosterWeekCard(i, ov || undefined) });
+        } catch (e2) { /* skip */ }
+      }
+    }
   }, [updateItemData]);
 
   // weekcard 아이템 "편집하기" → 편집기를 그 아이템의 template/주차로 열기
@@ -477,9 +485,9 @@ function Workspace() {
         onMoveSelected={moveSelectedBy}
         onConvert={convertCard}
         onEditCard={editCard}
-        onMakeWeekCard={compareWeekCards}
+        onMakeWeekCard={placeWeekCardsFrom}
       />
-      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorAutoCrop(true); setEditorRich(false); setEditingItemId(null); setEditorInitial(null); setCardEditorOpen(true); }} />
+      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorRich(false); setEditingItemId(null); setEditorInitial(null); setCardEditorOpen(true); }} />
       {/* 주차 카드는 월안 카드의 🧩 버튼으로 생성합니다 (좌상단 런처 제거) */}
       {/* 모바일: 채팅 시트 열기/닫기 (데스크톱에선 숨김) */}
       <button
@@ -515,10 +523,10 @@ function Workspace() {
             ← 보드로
           </button>
           <WeekCardBlueprintTest
-            autoCrop={editorAutoCrop}
             richEdit={editorRich}
             initialTemplate={editorInitial?.template || null}
             initialWeek={editorInitial?.week || 0}
+            posterSrc={[...items].reverse().find((it) => it.type === "infographic" && it.data?.src)?.data?.src || null}
             onApply={editingItemId ? (template) => {
               updateItemData(editingItemId, { template });
               setCardEditorOpen(false);

@@ -23,6 +23,10 @@ export const ILLO_KO: Record<string, string> = {
   star: "클레이 별", flower: "클레이 꽃", watermelon: "클레이 수박",
   cloud: "클레이 구름", rainbow: "클레이 무지개", crayon: "클레이 크레파스", paint: "클레이 물감",
   water: "클레이 물놀이", leaf: "클레이 나뭇잎", insect: "클레이 곤충",
+  calendar: "클레이 달력", puzzle: "클레이 퍼즐", camera: "클레이 카메라", drum: "클레이 북", icecream: "클레이 아이스크림",
+  umbrella: "클레이 파라솔", fan: "클레이 부채", hat: "클레이 모자", boat: "클레이 배", butterfly: "클레이 나비",
+  frog: "클레이 개구리", bird: "클레이 새", kite: "클레이 연", balloon: "클레이 풍선", watering_can: "클레이 물뿌리개",
+  bucket: "클레이 모래통", popsicle: "클레이 아이스바", cup: "클레이 음료", magnifier: "클레이 돋보기",
 };
 
 // 주차 제목·놀이명 키워드 → 어울리는 클레이 그림 종류 도출.
@@ -39,8 +43,26 @@ export function illoKindsForWeek(title: string, plays: string[]): string[] {
     [/조개|불가사리/, "shell"],
     [/모래성|모래/, "sandcastle"],
     [/물놀이|수영|바다|물방울/, "water"],
+    [/달력|캘린더|날짜|요일/, "calendar"],
+    [/퍼즐|맞추기|조각/, "puzzle"],
+    [/사진|카메라|찍기/, "camera"],
+    [/아이스크림|아이스바|빙수|얼음과자/, "icecream"],
+    // ── 기타(misc) ──
+    [/나비/, "butterfly"],
+    [/개구리/, "frog"],
+    [/새\b|새소리|참새/, "bird"],
+    [/우산|파라솔|양산/, "umbrella"],
+    [/부채|바람개비|선풍기/, "fan"],
+    [/모자/, "hat"],
+    [/배\b|보트|요트|돛단배/, "boat"],
+    [/연날리기|연\b/, "kite"],
+    [/풍선/, "balloon"],
+    [/물뿌리개|물주기/, "watering_can"],
+    [/양동이|모래통|삽/, "bucket"],
+    [/돋보기|관찰경/, "magnifier"],
+    [/화채|주스|음료|에이드/, "cup"],
     [/책|이야기|그림책|동화/, "book"],
-    [/노래|음악|악기|소리/, "music"],
+    [/노래|음악|악기|소리|북\b/, "music"],
     [/무지개/, "rainbow"],
     [/크레파스|크레용/, "crayon"],
     [/공놀이|공차기/, "ball"],
@@ -63,7 +85,8 @@ export function illoKindsForWeek(title: string, plays: string[]): string[] {
 // 작은 꾸밈 요소 종류 도출 — 자연/과일/식물 주차는 잎(leaf), 기본은 ✦(corner-sparkle)
 export function decoKindForWeek(title: string, plays: string[]): string {
   const text = `${(plays || []).join(" ")} ${title}`;
-  if (/과일|꽃|식물|나무|숲|자연|곤충|잎|채소|열매|바다|물놀이/.test(text)) return "leaf";
+  if (/꽃|화분|새싹/.test(text)) return "flower"; // 꽃 주차 → 꽃 꾸밈
+  if (/과일|식물|나무|숲|자연|곤충|잎|채소|열매|바다|물놀이/.test(text)) return "leaf";
   return "corner-sparkle";
 }
 
@@ -105,7 +128,7 @@ export function buildPosterWeekCard(idx: number, override?: WeekOverride): { can
   // 작은 꾸밈 (h=80) — 내용에서 도출(자연/과일 → 잎, 기본 → ✦). 우상/우하 모서리.
   const decoKind = (override && override.decoKind) || decoKindForWeek(title, playNames);
   const decoAsset = getCachedAsset(descriptorFor("decoration", decoKind)) || undefined;
-  const decoLabel = decoKind === "leaf" ? "클레이 잎" : "클레이 ✦";
+  const decoLabel = decoKind === "leaf" ? "클레이 잎" : decoKind === "flower" ? "클레이 꽃" : "클레이 ✦";
   const decoName = `${title} · 꾸밈 · ${decoLabel}`;
   const decos: EditableLayer[] = [
     { id: "deco-1", type: "image", name: decoName, editable: true, locked: false, x: cw - 104, y: 12, width: 94, height: 80, content: "꾸밈", src: decoAsset, style: { fit: "contain", radius: 0, background: "transparent" } },

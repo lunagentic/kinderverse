@@ -8,17 +8,15 @@ import { sampleSummerPlan } from "../data/sampleSummerPlan";
 import { monthPlanPoster } from "../data/monthPlanPoster";
 import { transformMonthlyPlanToInfographic } from "../transformers/monthlyToInfographic";
 import { getStylePack } from "../styles/stylePacks";
-import { buildMonthPosterPrompt } from "../prompts/buildImagePrompt";
 import type { EditableLayer } from "../templates/buildEditableWeekCardTemplate";
 import WeekCardEditor from "../components/WeekCardEditor";
 import LayerPanel from "../components/LayerPanel";
 import PropertyPanel from "../components/PropertyPanel";
-import RegionCropper from "../components/RegionCropper";
 import { exportNodeToPng } from "../utils/exportToPng";
 import { generateImageForPrompt } from "../utils/imageCache";
-import { sampleMonthPoster } from "../utils/sampleMonthPoster";
 import { loadComponents, saveComponent, deleteComponent } from "../utils/componentStore";
 import { removeBackground } from "../utils/removeBackground";
+import RegionCropper from "../components/RegionCropper";
 import { getAsset, getCachedAsset, descriptorFor } from "../utils/assetLibrary";
 import { buildPosterWeekCard, RICH_W, RICH_H } from "../templates/buildPosterWeekCard";
 
@@ -37,7 +35,7 @@ const SLOT_IDS = ["image-1", "image-2", "image-3"];
 const slotPromptFor = (wk: any, k: number) =>
   `유치원 "${wk.playNames[k] || wk.title}" 활동의 아이 작품 사진 한 장, 밝은 여름 분위기, 글자 없음`;
 
-export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = false, onPlaceOnBoard, initialTemplate = null, initialWeek = 0, onApply }: { autoCrop?: boolean; richEdit?: boolean; onPlaceOnBoard?: (src: string, size: { w: number; h: number }) => void; initialTemplate?: { canvas: { w: number; h: number }; layers: EditableLayer[] } | null; initialWeek?: number; onApply?: (template: { canvas: { w: number; h: number }; layers: EditableLayer[] }) => void }) {
+export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard, initialTemplate = null, initialWeek = 0, onApply, posterSrc = null }: { richEdit?: boolean; onPlaceOnBoard?: (src: string, size: { w: number; h: number }) => void; initialTemplate?: { canvas: { w: number; h: number }; layers: EditableLayer[] } | null; initialWeek?: number; onApply?: (template: { canvas: { w: number; h: number }; layers: EditableLayer[] }) => void; posterSrc?: string | null }) {
   const ig = useMemo(() => transformMonthlyPlanToInfographic(sampleSummerPlan), []);
 
   // 한 주차를 "밴드"(좌 텍스트 + 우 이미지 3장) 레이어로 빌드
@@ -85,19 +83,13 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     initialTemplate?.layers ? JSON.parse(JSON.stringify(initialTemplate.layers)) : richEdit ? buildRichWeekCard(initialWeek || 0) : buildForWeek(0).layers
   );
   const [selectedId, setSelectedId] = useState(null as string | null);
-  const [exporting, setExporting] = useState(false);
   const [genByLayer, setGenByLayer] = useState({} as Record<string, SlotGenState>);
-  const [referenceSrc, setReferenceSrc] = useState(null as string | null);
-  const [posterGen, setPosterGen] = useState({ loading: false, error: "" });
-  const [cropOpen, setCropOpen] = useState(!!autoCrop);
-  const [cropImage, setCropImage] = useState(() => sampleMonthPoster() as string | null); // 크로퍼 기본 = 샘플 월안 포스터
-  const [cropReference, setCropReference] = useState(null as string | null); // 원본 선택 영역(나란히 비교용)
-  const [capturedPhotos, setCapturedPhotos] = useState([] as string[]); // 캡처한 개별 사진들
-  const [cardCanvas, setCardCanvas] = useState(initialTemplate?.canvas ? initialTemplate.canvas : richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 크롭/리치 시 비율에 맞춤
+  const [cardCanvas, setCardCanvas] = useState(initialTemplate?.canvas ? initialTemplate.canvas : richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 리치 시 비율에 맞춤
   const stageRef = useRef(null as HTMLDivElement | null);
   const [components, setComponents] = useState(() => loadComponents()); // 저장한 컴포넌트들
   const [savingComp, setSavingComp] = useState(false);
   const [nukiBusy, setNukiBusy] = useState(null as string | null); // 누끼 처리 중인 레이어 id
+  const [cropOpen, setCropOpen] = useState(false); // 포스터에서 그림 추출(드래그 크롭)
   const [assetMsg, setAssetMsg] = useState(""); // 기본 에셋 생성 진행 메시지
   // 컴포넌트 저장 이름 입력 모달 (window.prompt 대신 — 임베디드 환경에서도 동작)
   const [saveModal, setSaveModal] = useState({ open: false, kind: "card", layerId: null as string | null, name: "" });
@@ -135,141 +127,11 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     return () => { cancelled = true; };
   }, [richEdit, weekIndex]);
 
-  // 월안 이미지(업로드 포스터 또는 🗓️ 생성한 월안 포스터)에서 영역 선택
-  const openRegionSelect = () => {
-    setCropImage(referenceSrc || sampleMonthPoster());
-    setCropOpen(true);
-  };
-
-  // 참조 이미지에서 배경색/잉크색 샘플링 (배경 = 모서리 평균, 잉크 = 배경과 가장 대비되는 색)
-  const sampleColors = (url: string): Promise<{ bg: string; ink: string } | null> =>
-    new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const w = 48, h = 32;
-          const c = document.createElement("canvas");
-          c.width = w; c.height = h;
-          const ctx = c.getContext("2d");
-          if (!ctx) { resolve(null); return; }
-          ctx.drawImage(img, 0, 0, w, h);
-          const d = ctx.getImageData(0, 0, w, h).data;
-          const px = (x: number, y: number) => { const i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-          const corners = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)];
-          const bg = [0, 1, 2].map((k) => Math.round(corners.reduce((s, cc) => s + cc[k], 0) / corners.length));
-          let best = bg, bestD = -1;
-          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-            const p = px(x, y);
-            const dist = (p[0] - bg[0]) ** 2 + (p[1] - bg[1]) ** 2 + (p[2] - bg[2]) ** 2;
-            if (dist > bestD) { bestD = dist; best = p; }
-          }
-          const hex = (cc: number[]) => "#" + cc.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
-          resolve({ bg: hex(bg), ink: hex(best) });
-        } catch {
-          resolve(null);
-        }
-      };
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
-
-  // 담은 사진들(N장)을 "액자 없이 원본 그대로" 우측에 N등분 배치 + 좌측 편집 텍스트.
-  // colors 가 있으면 샘플링한 배경/잉크색으로 디자인을 맞춘다.
-  // 캡처 사진은 "원본 비율 그대로"(사이즈 고정 X) — 각 사진 aspect 에 맞춰 폭이 결정됨. 위치/크기는 이후 자유 조정.
-  const buildCropCard = (
-    cropsIn: { url: string; sx: number; sy: number; sw: number; sh: number }[],
-    colors: { bg: string; ink: string } | null,
-    bgImg: string | null = null,
-    regionBox: { x: number; y: number; w: number; h: number } | null = null,
-    canvas: { w: number; h: number } = { w: W, h: H }
-  ): EditableLayer[] => {
-    const accent = PACK.palette[weekIndex % PACK.palette.length];
-    const bg = (colors && colors.bg) || PACK.bg;
-    const ink = (colors && colors.ink) || PACK.ink;
-    const cw = canvas.w, ch = canvas.h;
-    const rb = regionBox && regionBox.w > 0 && regionBox.h > 0 ? regionBox : null;
-    // 사진 배치: rb 있으면 원본 영역 대비 상대좌표로 "원위치" 매핑, 없으면 가로줄 폴백
-    let cursorX = Math.round(cw * 0.42);
-    const meta = cropsIn.map((cp, i) => {
-      if (rb) {
-        return {
-          url: cp.url, i,
-          x: Math.round(((cp.sx - rb.x) / rb.w) * cw),
-          y: Math.round(((cp.sy - rb.y) / rb.h) * ch),
-          w: Math.round((cp.sw / rb.w) * cw),
-          h: Math.round((cp.sh / rb.h) * ch),
-        };
-      }
-      const ar = cp.sh > 0 ? cp.sw / cp.sh : 1;
-      const w = Math.max(40, Math.round(240 * ar));
-      const x = cursorX;
-      cursorX += w + 16;
-      return { url: cp.url, i, x, y: Math.round(ch * 0.2), w, h: 240 };
-    });
-    const photos: EditableLayer[] = meta.map((m) => ({
-      id: `image-${m.i + 1}`, type: "image", name: `작품 사진 ${m.i + 1}`, editable: true, locked: false,
-      x: m.x, y: m.y, width: m.w, height: m.h,
-      content: week.artifacts[m.i] || `작품 ${m.i + 1}`, src: m.url, style: { fit: "cover", radius: 8 }, // 원본 비율·원위치, 액자 없음
-    }));
-    const caps: EditableLayer[] = meta.map((m) => ({
-      id: `caption-${m.i + 1}`, type: "text", name: `사진 캡션 ${m.i + 1}`, editable: true, locked: false,
-      x: m.x, y: m.y + m.h + 4, width: m.w, height: 26,
-      content: week.artifacts[m.i] || "", src: undefined, style: { fontSize: 15, fontWeight: 700, color: ink, align: "center", lineClamp: 1, fontFamily: PACK.font },
-    }));
-    // 텍스트(좌측) — 캔버스 높이에 비례 배치, 이후 자유 조정
-    const tx = Math.round(cw * 0.035);
-    return [
-      { id: "background", type: "shape", name: "배경", editable: true, locked: true, x: 0, y: 0, width: cw, height: ch, content: undefined, src: undefined, style: { fill: bg, backgroundColor: bg, radius: 28 } },
-      ...(bgImg ? [{ id: "bg-image", type: "image", name: "월안 배경", editable: true, locked: false, x: 0, y: 0, width: cw, height: ch, content: "배경", src: bgImg, style: { fit: "cover", radius: 28 } } as EditableLayer] : []),
-      { id: "week-badge", type: "text", name: "주차 배지", editable: true, locked: false, x: tx, y: Math.round(ch * 0.07), width: 110, height: 44, content: week.weekLabel, src: undefined, style: { fontSize: 22, fontWeight: 800, color: ink, align: "center", backgroundColor: PACK.soft, radius: 22, fontFamily: PACK.font } },
-      { id: "title", type: "text", name: "제목", editable: true, locked: false, x: tx, y: Math.round(ch * 0.2), width: Math.round(cw * 0.36), height: 64, content: week.title, src: undefined, style: { fontSize: 42, fontWeight: 800, color: ink, align: "left", lineClamp: 1, fontFamily: PACK.font } },
-      { id: "play-names", type: "text", name: "놀이 목록", editable: true, locked: false, x: tx, y: Math.round(ch * 0.42), width: Math.round(cw * 0.36), height: Math.round(ch * 0.42), content: week.playNames.map((p) => `· ${p}`).join("\n"), src: undefined, style: { fontSize: 22, fontWeight: 600, color: PACK.body, align: "left", fontFamily: PACK.font } },
-      ...photos,
-      ...caps,
-    ];
-  };
-
-  // 크롭 = 담은 사진(N장)을 그대로 슬롯에 넣음(생성 X, 액자 X). 참조영역으로 색 샘플링 + 나란히 비교.
-  const onCropped = async (
-    cropsIn: { url: string; sx: number; sy: number; sw: number; sh: number }[],
-    reference: string | null,
-    background: string | null,
-    regionBox: { x: number; y: number; w: number; h: number } | null
-  ) => {
-    setCropReference(reference);
-    setCapturedPhotos(cropsIn.map((c) => c.url));
-    // 리치 편집: 캡처한 "실제 그림"을 장식 그림 슬롯(illo-1, illo-2…)에 그대로 채움 (카드 구조 유지)
-    if (richEdit) {
-      if (cropsIn.length) {
-        setLayers((ls) => ls.map((l) => {
-          const m = /^illo-(\d+)$/.exec(l.id);
-          const cp = m ? cropsIn[Number(m[1]) - 1] : null;
-          return cp ? { ...l, type: "image", src: cp.url, style: { ...l.style, fit: "contain" } } : l;
-        }));
-        setSelectedId(null);
-      }
-      setCropOpen(false);
-      return;
-    }
-    if (cropsIn.length || background) {
-      // 카드 비율을 원본 영역 비율에 맞춤
-      const canvas = regionBox && regionBox.w > 0 ? { w: W, h: Math.round((W * regionBox.h) / regionBox.w) } : { w: W, h: H };
-      setCardCanvas(canvas);
-      const colors = reference ? await sampleColors(reference) : null;
-      setLayers(buildCropCard(cropsIn, colors, background, regionBox, canvas));
-      setSelectedId(null);
-      setGenByLayer({});
-    }
-    setCropOpen(false);
-  };
-
   const chooseWeek = (i: number) => {
     setWeekIndex(i);
     setLayers(richEdit ? buildRichWeekCard(i) : buildForWeek(i).layers);
     setSelectedId(null);
     setGenByLayer({});
-    setCropReference(null);
-    setCapturedPhotos([]);
     setCardCanvas(richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 모드별 비율 복귀
   };
 
@@ -283,8 +145,7 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     if (!p) return;
     setGenByLayer((s) => ({ ...s, [layerId]: { loading: true, error: "", cached: false } }));
     try {
-      const useRef = referenceSrc || null;
-      const { src, cached } = await generateImageForPrompt(p, { force, reference: useRef });
+      const { src, cached } = await generateImageForPrompt(p, { force });
       updateLayer(layerId, { src });
       setGenByLayer((s) => ({ ...s, [layerId]: { loading: false, error: "", cached } }));
     } catch (e: any) {
@@ -296,26 +157,6 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     for (const id of SLOT_IDS) await generateSlotImage(id, false);
   };
   const anyLoading = SLOT_IDS.some((id) => genByLayer[id]?.loading);
-
-  const onUploadReference = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => setReferenceSrc(String(reader.result));
-    reader.readAsDataURL(f);
-    e.target.value = "";
-  };
-
-  const generateMonthPoster = async () => {
-    setPosterGen({ loading: true, error: "" });
-    try {
-      const { src } = await generateImageForPrompt(buildMonthPosterPrompt(ig, PACK), {});
-      setReferenceSrc(src);
-      setPosterGen({ loading: false, error: "" });
-    } catch (e: any) {
-      setPosterGen({ loading: false, error: (e && e.message) || "생성 실패" });
-    }
-  };
 
   const [placing, setPlacing] = useState(false);
   // 이 카드를 PNG 로 캡처해 보드 위에 이미지 아이템으로 올림
@@ -332,20 +173,6 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
       console.warn("보드에 올리기 실패:", e);
     } finally {
       setPlacing(false);
-    }
-  };
-
-  const exportPng = async () => {
-    if (!stageRef.current) return;
-    setExporting(true);
-    setSelectedId(null);
-    try {
-      await new Promise((r) => setTimeout(r, 60)); // 선택 해제 반영 (rAF 는 백그라운드 탭에서 멈춤)
-      await exportNodeToPng(stageRef.current, { fileName: template.name, width: 1280, backgroundColor: template.background.color, cacheBust: false });
-    } catch (e) {
-      console.warn("PNG 저장 실패:", e);
-    } finally {
-      setExporting(false);
     }
   };
 
@@ -407,8 +234,6 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     setCardCanvas(c.canvas);
     setSelectedId(null);
     setGenByLayer({});
-    setCropReference(null);
-    setCapturedPhotos([]);
   };
 
   // 선택한 요소(이미지 레이어)를 "컴포넌트"로 저장 — 모달로 이름 입력
@@ -438,6 +263,26 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
     setComponents(deleteComponent(id));
   };
 
+  // A안: 포스터에서 드래그로 선택한 영역을 누끼 → 선택한 이미지 슬롯(없으면 illo-1)에 그대로 채움
+  const onPosterCrop = async (photos: { url: string }[]) => {
+    setCropOpen(false);
+    const first = photos && photos[0];
+    if (!first) return;
+    const sel = layers.find((l) => l.id === selectedId);
+    const targetId = sel && sel.type === "image" ? sel.id : (layers.find((l) => /^illo-/.test(l.id))?.id || "illo-1");
+    setNukiBusy(targetId);
+    try {
+      const cut = await removeBackground(first.url);
+      const cur = layers.find((l) => l.id === targetId);
+      updateLayer(targetId, { type: "image", src: cut, style: { ...(cur?.style || {}), fit: "contain", background: "transparent" } });
+      setSelectedId(targetId);
+    } catch (e) {
+      console.warn("포스터에서 그림 가져오기 실패:", e);
+    } finally {
+      setNukiBusy(null);
+    }
+  };
+
   const card: React.CSSProperties = { background: "#fff", border: "1px solid #e6ddd2", borderRadius: 10 };
   const weekBtn = (active: boolean): React.CSSProperties => ({ padding: "5px 12px", borderRadius: 8, border: "1px solid #d8c9bb", background: active ? "#E8862B" : "#fff", color: active ? "#fff" : "#3f3833", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const smallBtn: React.CSSProperties = { padding: "4px 10px", borderRadius: 7, border: "1px solid #E8862B", background: "#fff", color: "#E8862B", fontSize: 12, fontWeight: 700, cursor: "pointer" };
@@ -454,7 +299,7 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
           {richEdit ? (
             <>월간계획안 포스터의 <b>주차 카드(배지·제목·가장자리 꾸밈·놀이명)</b>를 <b>그대로 재현</b>. 장식 그림은 <b>실제 이미지 슬롯</b> — <b>✂️ 월안에서 영역 선택</b>으로 포스터의 그림을 캡처하면 그대로 채워집니다(또는 속성패널에서 업로드/URL). 모든 요소는 클릭→선택, 더블클릭→글자 편집, 드래그·리사이즈·속성패널로 수정.</>
           ) : (
-            <>포스터의 1주차 구조(<b>좌 텍스트 + 우 작품 사진 3장</b>)를 재현. <b>summer_play</b> StylePack 공유(폰트/팔레트 일치). 작품 사진은 업로드한 포스터를 스타일 기준으로 컨디셔닝.</>
+            <>포스터의 1주차 구조(<b>좌 텍스트 + 우 작품 사진 3장</b>)를 재현. <b>summer_play</b> StylePack 공유(폰트/팔레트 일치).</>
           )}
         </p>
 
@@ -464,59 +309,12 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
           {ig.weeks.map((w, i) => (
             <button key={w.id} onClick={() => chooseWeek(i)} style={weekBtn(weekIndex === i)} title={w.title}>{w.weekLabel}</button>
           ))}
-          <button onClick={openRegionSelect} style={{ ...smallBtn, marginLeft: 8, borderColor: "#5B53A8", background: "#5B53A8", color: "#fff" }} title="월안 이미지에서 영역을 드래그로 선택해 편집 카드로 만들기">
-            ✂️ 월안에서 영역 선택
-          </button>
-        </div>
-
-        {/* 스타일 기준(레퍼런스): 업로드 / 월안 포스터 생성 */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#8a8078" }}>🎨 스타일 기준(레퍼런스)</span>
-          <label title="가지고 있는 실제 포스터 이미지를 올려 스타일 기준으로 지정" style={{ ...smallBtn, borderColor: "#d8c9bb", color: "#3f3833" }}>
-            📤 이미지 업로드→기준
-            <input type="file" accept="image/*" style={{ display: "none" }} onChange={onUploadReference} />
-          </label>
-          <button onClick={generateMonthPoster} disabled={posterGen.loading} style={smallBtn}>
-            {posterGen.loading ? "생성 중…" : "🗓️ 월안 포스터 생성→기준"}
-          </button>
-          {posterGen.error && <span style={{ fontSize: 12, color: "#b4452f" }}>{posterGen.error}</span>}
-          {referenceSrc && (
-            <>
-              <img src={referenceSrc} alt="레퍼런스" style={{ width: 34, height: 34, borderRadius: 6, objectFit: "cover", border: "1px solid #d8c9bb" }} />
-              <span style={{ fontSize: 12, color: "#4f9d69" }}>ON · 작품 사진이 이 분위기로 생성됩니다</span>
-              <button onClick={() => setReferenceSrc(null)} style={{ ...smallBtn, borderColor: "#d8c9bb", color: "#3f3833" }}>해제</button>
-            </>
+          {posterSrc && (
+            <button onClick={() => setCropOpen(true)} style={{ ...smallBtn, marginLeft: 8, borderColor: "#5B53A8", background: "#5B53A8", color: "#fff" }} title="생성된 월안 포스터에서 그림 영역을 드래그로 선택 → 누끼 → 선택 슬롯에 채움">
+              📥 포스터에서 그림 가져오기
+            </button>
           )}
         </div>
-
-        {/* 3분할 */}
-        {cropReference && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#8a8078", marginBottom: 6 }}>
-              원본 선택 영역 (참고 · 아래 편집 카드와 같은 크기로 비교)
-              <button onClick={() => setCropReference(null)} style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 6, border: "1px solid #d8c9bb", background: "#fff", color: "#3f3833", fontSize: 11, cursor: "pointer" }}>숨기기</button>
-            </div>
-            <img src={cropReference} alt="원본 선택 영역" style={{ width: 740, maxWidth: "100%", borderRadius: 12, border: "2px solid #5B53A8", display: "block" }} />
-          </div>
-        )}
-
-        {capturedPhotos.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#8a8078", marginBottom: 6 }}>캡처한 영역 ({capturedPhotos.length}장)</div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {capturedPhotos.map((p, i) => (
-                <img key={i} src={p} alt={`캡처 ${i + 1}`} title={`캡처 ${i + 1}`} style={{ height: 92, borderRadius: 8, border: "1px solid #d8c9bb", display: "block", background: "#fff" }} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 기본 디자인 에셋 생성 진행 */}
-        {assetMsg && (
-          <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: "#efeafc", border: "1px solid #d8cff2", color: "#5B53A8", fontSize: 12.5, fontWeight: 700 }}>
-            🎨 {assetMsg}
-          </div>
-        )}
 
         {/* 내 컴포넌트 (저장한 디자인 — 클릭하면 캔버스로 불러오기) */}
         {components.length > 0 && (
@@ -578,9 +376,9 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
           </button>
         )}
         {onApply && (
-          <button onClick={() => onApply({ canvas: cardCanvas, layers })} title="편집 내용을 보드의 카드에 반영"
+          <button onClick={() => onApply({ canvas: cardCanvas, layers })} title="편집 내용을 저장하고 보드 카드에 반영"
             style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: "#E8862B", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(232,134,43,0.4)" }}>
-            ✅ 보드에 반영
+            ✅ 저장 후 보드에 반영
           </button>
         )}
         {onPlaceOnBoard && !onApply && (
@@ -589,17 +387,14 @@ export default function WeekCardBlueprintTest({ autoCrop = false, richEdit = fal
             {placing ? "올리는 중…" : "🧷 보드에 올리기"}
           </button>
         )}
-        <button onClick={saveCurrentComponent} disabled={savingComp} title="현재 디자인을 컴포넌트로 저장(브라우저에 보관 · 재사용/재편집)"
+        <button onClick={saveCurrentComponent} disabled={savingComp} title="이 카드를 컴포넌트로 저장(브라우저에 보관 · 재사용/재편집)"
           style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: savingComp ? "#9a93d6" : "#5B53A8", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(91,83,168,0.4)" }}>
-          {savingComp ? "저장 중…" : "💾 컴포넌트로 저장"}
-        </button>
-        <button onClick={exportPng} disabled={exporting} title="밴드 카드를 PNG 로 저장 (무료)"
-          style={{ padding: "11px 18px", borderRadius: 26, border: "1px solid #d8c9bb", background: exporting ? "#e9e2d8" : "#fff", color: "#3f3833", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(0,0,0,0.15)" }}>
-          {exporting ? "저장 중…" : "🖼 이번 버전 (PNG)"}
+          {savingComp ? "저장 중…" : "💾 이 카드 컴포넌트로 저장"}
         </button>
       </div>
 
-      {cropOpen && <RegionCropper imageSrc={cropImage} onCrop={onCropped} onClose={() => setCropOpen(false)} />}
+      {/* 포스터에서 그림 추출(드래그 크롭 → 누끼) */}
+      {cropOpen && <RegionCropper imageSrc={posterSrc} onCrop={onPosterCrop} onClose={() => setCropOpen(false)} />}
 
       {/* 컴포넌트 저장 이름 입력 모달 (window.prompt 대체) */}
       {saveModal.open && (

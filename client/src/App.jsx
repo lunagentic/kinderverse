@@ -273,7 +273,6 @@ function Workspace() {
     setEditingItemId(item.id);
     setEditorInitial({ template: item.data?.template || null, week: item.data?.weekIndex || 0 });
     setEditorRich(true);
-    setEditorAutoCrop(false);
     setCardEditorOpen(true);
   }, []);
 

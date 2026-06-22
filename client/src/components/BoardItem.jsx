@@ -652,6 +652,20 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose }) {
       {!isImage && (
         <div className="dpanel-sec">
           <div className="dpanel-label">색상</div>
+          {/* 스포이드/직접 선택 (네이티브 컬러 피커) */}
+          <div className="dpanel-eyedrop">
+            <input
+              type="color"
+              className="dpanel-color-input"
+              value={(() => {
+                const c = isText ? s.color : s.bg;
+                return typeof c === "string" && /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#ffffff";
+              })()}
+              onInput={(e) => setStyle(isText ? { color: e.target.value } : { bg: e.target.value })}
+              title="스포이드 / 직접 색 선택"
+            />
+            <span className="dpanel-eyedrop-label">스포이드 / 직접 선택</span>
+          </div>
           {COLOR_GROUPS.map((g) => (
             <div key={g.name} className="dpanel-grp">
               <div className="dpanel-grp-name">{g.name}</div>

@@ -33,7 +33,9 @@ import type {
 } from "./types";
 
 const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+const HERO_H = 560; // 상단 Hero 영역 높이 (확대: 420 → 560)
+const SECTION_SHIFT = HERO_H - 420; // 하단 섹션 이동량 (140)
+const CANVAS_H = 1920 + SECTION_SHIFT; // 캔버스도 그만큼 확대 (2060)
 
 // 레퍼런스 기본 콘텐츠 (payload 없을 때)
 const DEFAULT_CONTENT = {
@@ -84,7 +86,7 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     buildHeroScene({
       theme: T,
       themeFamily: recipe.themeFamily,
-      region: { x: 0, y: 0, width: CANVAS_W, height: 420 }, // 풀블리드 상단 장면
+      region: { x: 0, y: 0, width: CANVAS_W, height: HERO_H }, // 풀블리드 상단 장면(확대)
       title: C.title,
       age: C.age,
       lifeTheme: C.theme,
@@ -199,9 +201,24 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
   });
   const textLayer: Layer = { id: "layer-text", type: "text", editable: true, movable: true, visible: true, children: texts };
 
+  // Hero 확대분(SECTION_SHIFT)만큼 하단 섹션 전체를 아래로 이동 (Hero/캔버스 배경은 제외)
+  const heroIds = new Set(
+    [...hero.shapes, ...hero.stickers, ...hero.decorations, ...hero.texts].map((e) => e.id)
+  );
+  heroIds.add("Background");
+  const shiftChild = (c: ShapeElement | TextElement | AssetSlot): ShapeElement | TextElement | AssetSlot => {
+    if (heroIds.has(c.id)) return c;
+    if ("frame" in c) return { ...c, frame: { ...c.frame, y: c.frame.y + SECTION_SHIFT } };
+    return { ...c, y: c.y + SECTION_SHIFT };
+  };
+  const layers = [background, shapeLayer, stickerLayer, decorationLayer, textLayer].map((layer) => ({
+    ...layer,
+    children: layer.children.map((c) => shiftChild(c as ShapeElement | TextElement | AssetSlot)),
+  }));
+
   return {
     styleFamily: recipe.styleFamily,
     canvas: { width: CANVAS_W, height: CANVAS_H, editable: true },
-    layers: [background, shapeLayer, stickerLayer, decorationLayer, textLayer],
+    layers,
   };
 }

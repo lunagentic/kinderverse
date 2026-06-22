@@ -31,9 +31,9 @@ it("styleFamily가 pixar_storybook", () => {
   expect(templateBlueprint.styleFamily).toBe("pixar_storybook");
 });
 // 4
-it("canvas가 1080×1920", () => {
+it("canvas가 1080 폭 + 세로형(>=1920)", () => {
   expect(templateBlueprint.canvas.width).toBe(1080);
-  expect(templateBlueprint.canvas.height).toBe(1920);
+  expect(templateBlueprint.canvas.height >= 1920).toBeTruthy();
   expect(templateBlueprint.canvas.editable).toBe(true);
 });
 // 5

@@ -14,6 +14,7 @@ import {
   generateImage,
   buildInfographicPrompt,
   buildPosterImagePrompt,
+  buildPosterImagePromptByVersion,
 } from "./prompts/index.js";
 
 // ── 컨텍스트 파서 ──
@@ -243,12 +244,13 @@ export async function generateInfographic(plan) {
 }
 
 // 월안 → 완성 인포그래픽 포스터 이미지 1장 (gpt-image). 실패 시 null.
-export async function generateInfographicPoster(plan) {
+// version: 1(기본) | 2 — "이미지 v1"/"이미지 v2" 버튼이 전달.
+export async function generateInfographicPoster(plan, version = 1) {
   if (!plan || typeof plan !== "object") return null;
-  const prompt = buildPosterImagePrompt(plan);
+  const prompt = buildPosterImagePromptByVersion(plan, version);
   const img = await generateImage(prompt, { size: "1024x1536" });
   if (!img) return null;
-  return { src: img.dataUrl, model: img.model, prompt };
+  return { src: img.dataUrl, model: img.model, prompt, version: Number(version) === 2 ? 2 : 1 };
 }
 
 export async function convertItem({ format, title, content }) {

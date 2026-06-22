@@ -186,7 +186,7 @@ function planToText(item) {
   return genericToText(p);
 }
 
-export default function ChatPanel({ onGenerate, onOpenCardTest }) {
+export default function ChatPanel({ onGenerate }) {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -256,24 +256,6 @@ export default function ChatPanel({ onGenerate, onOpenCardTest }) {
           <Sparkles size={18} strokeWidth={2.4} /> verse
         </span>
         <span className="chat-sub">채팅으로 보드를 채우세요</span>
-        <button
-          onClick={onOpenCardTest}
-          title="주간 카드 편집기를 보드 위에서 열기"
-          style={{
-            marginLeft: "auto",
-            fontSize: 12,
-            fontWeight: 700,
-            color: "#6a5acd",
-            background: "#fff",
-            border: "1px solid #d8c9bb",
-            borderRadius: 8,
-            padding: "4px 10px",
-            whiteSpace: "nowrap",
-            cursor: "pointer",
-          }}
-        >
-          🧪 카드 테스트
-        </button>
       </header>
 
       <div className="chat-list" ref={listRef}>

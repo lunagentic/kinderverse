@@ -11,6 +11,7 @@ import {
   renderInfographicFromRaw,
 } from "./renderer/pipeline";
 import { toDesignDoc } from "./renderer/adapters/toDesignDoc";
+import { CanvasEditor } from "./editor/CanvasEditor";
 import "./board.css";
 
 // 여러 디자인 문서를 가로로 나란히 합쳐 하나의 DesignDoc 으로 (한번에 보기)
@@ -52,6 +53,11 @@ const RENDER_PREVIEW =
 const WEEKCARD_TEST =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("render") === "weekcard";
+
+// Phase 4: ?editor=1 → 캔버스 디자인 에디터 (monthly_plan_v1 / 여름이 왔어요)
+const EDITOR_MODE =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).has("editor");
 
 let idCounter = 1;
 // 카운터 + 랜덤 접미사 → HMR/리로드로 카운터가 리셋돼도 기존 아이템과 ID 충돌 방지
@@ -126,6 +132,13 @@ function cardToContent(item) {
 export default function App() {
   if (WEEKCARD_TEST) return <WeekCardBlueprintTest />;
   if (RENDER_PREVIEW) return <RendererPreview />;
+  if (EDITOR_MODE)
+    return (
+      <CanvasEditor
+        input={{ type: "monthly_plan", theme: "여름이 왔어요", age: "3~5세", month: "6월" }}
+        onClose={() => { window.location.search = ""; }}
+      />
+    );
   return <Workspace />;
 }
 
@@ -271,7 +284,7 @@ function Workspace() {
   // weekcard 아이템 "편집하기" → 편집기를 그 아이템의 template/주차로 열기
   const editCard = useCallback((item) => {
     setEditingItemId(item.id);
-    setEditorInitial({ template: item.data?.template || null, week: item.data?.weekIndex || 0 });
+    setEditorInitial({ template: item.data?.template || null, week: item.data?.weekIndex || 0, override: item.data?.override || null });
     setEditorRich(true);
     setCardEditorOpen(true);
   }, []);
@@ -380,9 +393,11 @@ function Workspace() {
     }
 
     // 월안 "이미지": 인포그래픽 포스터 1장 (월안 → gpt-image → 이미지)
-    if (format === "image" && item.data?.feature_id === "monthly_plan") {
+    // format "image" = v1, "imageV2" = v2 (프롬프트 버전만 다름)
+    if ((format === "image" || format === "imageV2") && item.data?.feature_id === "monthly_plan") {
       const payload = item.data?.payload;
       if (!payload) return;
+      const version = format === "imageV2" ? 2 : 1;
       const W = 480;
       const h = Math.round((W * 297) / 210); // A4 세로 비율
       const id = nextId();
@@ -391,7 +406,7 @@ function Workspace() {
         const pos = rightOf(prev, W);
         return [
           ...prev,
-          { id, type: "infographic", data: { payload, src: null, loading: true, title: item.data?.title || "인포그래픽" }, x: pos.x, y: pos.y, w: W, h },
+          { id, type: "infographic", data: { payload, version, src: null, loading: true, title: `${item.data?.title || "인포그래픽"} v${version}` }, x: pos.x, y: pos.y, w: W, h },
         ];
       });
       setSelectedId(id);
@@ -400,7 +415,7 @@ function Workspace() {
         const res = await fetch("/api/infographic", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ payload }),
+          body: JSON.stringify({ payload, version }),
           signal: AbortSignal.timeout(300000),
         });
         const { src } = res.ok ? await res.json() : { src: null };
@@ -486,7 +501,7 @@ function Workspace() {
         onEditCard={editCard}
         onMakeWeekCard={placeWeekCardsFrom}
       />
-      <ChatPanel onGenerate={addGenerated} onOpenCardTest={() => { setEditorRich(false); setEditingItemId(null); setEditorInitial(null); setCardEditorOpen(true); }} />
+      <ChatPanel onGenerate={addGenerated} />
       {/* 주차 카드는 월안 카드의 🧩 버튼으로 생성합니다 (좌상단 런처 제거) */}
       {/* 모바일: 채팅 시트 열기/닫기 (데스크톱에선 숨김) */}
       <button
@@ -498,45 +513,53 @@ function Workspace() {
       </button>
       {chatOpen && <div className="mobile-chat-backdrop" onClick={() => setChatOpen(false)} />}
 
-      {/* 주간 카드 편집기 — 보드 위 인앱 오버레이 (새 탭 없이 테스트) */}
+      {/* 주간 카드 편집기 — 보드 위 모달 (딤 배경 + 중앙 카드형 박스) */}
       {cardEditorOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "#efe9e0", overflow: "auto" }}>
-          <button
-            onClick={() => setCardEditorOpen(false)}
-            style={{
-              position: "fixed",
-              right: 16,
-              top: 16,
-              zIndex: 2100,
-              padding: "8px 14px",
-              borderRadius: 10,
-              border: "none",
-              background: "#3f3833",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: "pointer",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
-            }}
-          >
-            ← 보드로
-          </button>
-          <WeekCardBlueprintTest
-            richEdit={editorRich}
-            initialTemplate={editorInitial?.template || null}
-            initialWeek={editorInitial?.week || 0}
-            posterSrc={[...items].reverse().find((it) => it.type === "infographic" && it.data?.src)?.data?.src || null}
-            onApply={editingItemId ? (template) => {
-              updateItemData(editingItemId, { template });
-              setCardEditorOpen(false);
-              setEditingItemId(null);
-              setEditorInitial(null);
-            } : undefined}
-            onPlaceOnBoard={(src, size) => {
-              addGenerated({ type: "image", data: { src, alt: "주차 카드" }, size });
-              setCardEditorOpen(false);
-            }}
-          />
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(40,36,32,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ position: "relative", width: "min(920px, 80vw)", height: "min(76vh, 760px)", background: "#efe9e0", borderRadius: 16, overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,0.35)" }}>
+            <button
+              onClick={() => setCardEditorOpen(false)}
+              style={{
+                position: "absolute",
+                right: 14,
+                top: 12,
+                zIndex: 1,
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: "none",
+                background: "#3f3833",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(0,0,0,0.2)",
+              }}
+            >
+              ← 보드로
+            </button>
+            <WeekCardBlueprintTest
+              embedded
+              richEdit={editorRich}
+              initialTemplate={editorInitial?.template || null}
+              initialWeek={editorInitial?.week || 0}
+              initialOverride={editorInitial?.override || null}
+              posterSrc={[...items].reverse().find((it) => it.type === "infographic" && it.data?.src)?.data?.src || null}
+              onApply={editingItemId ? (template) => {
+                updateItemData(editingItemId, { template });
+                // 템플릿 비율(예: 블루프린트 1080²)에 맞춰 보드 카드 높이 보정
+                const it = itemsRef.current.find((x) => x.id === editingItemId);
+                const cv = template?.canvas;
+                if (it && cv && cv.w) updateItem(editingItemId, { h: Math.round(it.w * cv.h / cv.w) });
+                setCardEditorOpen(false);
+                setEditingItemId(null);
+                setEditorInitial(null);
+              } : undefined}
+              onPlaceOnBoard={(src, size) => {
+                addGenerated({ type: "image", data: { src, alt: "주차 카드" }, size });
+                setCardEditorOpen(false);
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

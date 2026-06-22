@@ -66,10 +66,11 @@ app.post("/api/convert", async (req, res) => {
 // 월안 → 완성 인포그래픽 포스터 이미지 1장(gpt-image). 실패 시 src:null.
 app.post("/api/infographic", async (req, res) => {
   const plan = req.body?.payload;
+  const version = Number(req.body?.version) === 2 ? 2 : 1; // 1(기본) | 2
   if (!plan) return res.status(400).json({ error: "payload(월안)가 필요합니다." });
   try {
-    const poster = await generateInfographicPoster(plan);
-    res.json({ src: poster?.src || null, model: poster?.model || null });
+    const poster = await generateInfographicPoster(plan, version);
+    res.json({ src: poster?.src || null, model: poster?.model || null, version: poster?.version || version });
   } catch (err) {
     console.error("[verse] infographic error:", err);
     res.json({ src: null });

@@ -138,11 +138,24 @@ export default function BoardItem({
           <button onClick={() => onConvert(item, "document")} title="문서">
             <FileText size={13} />
           </button>
-          <button onClick={() => onConvert(item, "image")} title="이미지">
-            <ImageIcon size={13} />
-          </button>
           {item.type === "plan" && item.data?.feature_id === "monthly_plan" ? (
             <>
+              <button
+                onClick={() => onConvert(item, "image")}
+                title="이미지 v1 (인포그래픽 프롬프트 버전 1)"
+                style={{ display: "inline-flex", alignItems: "center", gap: 1 }}
+              >
+                <ImageIcon size={13} />
+                <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>1</span>
+              </button>
+              <button
+                onClick={() => onConvert(item, "imageV2")}
+                title="이미지 v2 (인포그래픽 프롬프트 버전 2)"
+                style={{ display: "inline-flex", alignItems: "center", gap: 1 }}
+              >
+                <ImageIcon size={13} />
+                <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>2</span>
+              </button>
               <button onClick={() => onConvert(item, "kinderlab")} title="킨더랩">
                 <Palette size={13} />
               </button>
@@ -156,9 +169,14 @@ export default function BoardItem({
               )}
             </>
           ) : (
-            <button onClick={() => onConvert(item, "design")} title="디자인 템플릿">
-              <Palette size={13} />
-            </button>
+            <>
+              <button onClick={() => onConvert(item, "image")} title="이미지">
+                <ImageIcon size={13} />
+              </button>
+              <button onClick={() => onConvert(item, "design")} title="디자인 템플릿">
+                <Palette size={13} />
+              </button>
+            </>
           )}
         </div>
       )}

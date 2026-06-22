@@ -19,6 +19,8 @@ import { removeBackground } from "../utils/removeBackground";
 import RegionCropper from "../components/RegionCropper";
 import { getAsset, getCachedAsset, descriptorFor } from "../utils/assetLibrary";
 import { buildPosterWeekCard, RICH_W, RICH_H } from "../templates/buildPosterWeekCard";
+import { buildWeekCardBlueprint } from "../blueprints/buildWeekCardBlueprint";
+import { buildEditableWeekCardTemplate } from "../templates/buildEditableWeekCardTemplate";
 
 interface SlotGenState {
   loading: boolean;
@@ -35,7 +37,7 @@ const SLOT_IDS = ["image-1", "image-2", "image-3"];
 const slotPromptFor = (wk: any, k: number) =>
   `유치원 "${wk.playNames[k] || wk.title}" 활동의 아이 작품 사진 한 장, 밝은 여름 분위기, 글자 없음`;
 
-export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard, initialTemplate = null, initialWeek = 0, onApply, posterSrc = null }: { richEdit?: boolean; onPlaceOnBoard?: (src: string, size: { w: number; h: number }) => void; initialTemplate?: { canvas: { w: number; h: number }; layers: EditableLayer[] } | null; initialWeek?: number; onApply?: (template: { canvas: { w: number; h: number }; layers: EditableLayer[] }) => void; posterSrc?: string | null }) {
+export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard, initialTemplate = null, initialWeek = 0, onApply, posterSrc = null, embedded = false, initialOverride = null }: { richEdit?: boolean; onPlaceOnBoard?: (src: string, size: { w: number; h: number }) => void; initialTemplate?: { canvas: { w: number; h: number }; layers: EditableLayer[] } | null; initialWeek?: number; onApply?: (template: { canvas: { w: number; h: number }; layers: EditableLayer[] }) => void; posterSrc?: string | null; embedded?: boolean; initialOverride?: { weekLabel?: string; title?: string; playNames?: string[] } | null }) {
   const ig = useMemo(() => transformMonthlyPlanToInfographic(sampleSummerPlan), []);
 
   // 한 주차를 "밴드"(좌 텍스트 + 우 이미지 3장) 레이어로 빌드
@@ -133,6 +135,25 @@ export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard
     setSelectedId(null);
     setGenByLayer({});
     setCardCanvas(richEdit ? { w: RICH_W, h: RICH_H } : { w: W, h: H }); // 모드별 비율 복귀
+  };
+
+  // 🧱 블루프린트 버전: 현재 주차를 블루프린트 레이아웃(1080² · 좌 텍스트 + 우 main/sub2)으로 전환.
+  //  콘텐츠(주차/제목/놀이명)는 현재 카드 내용(initialOverride)으로 보존, 없으면 샘플(ig).
+  const applyBlueprintVersion = () => {
+    const base = ig.weeks[weekIndex % ig.weeks.length];
+    const ov = initialOverride;
+    const wk = {
+      ...base,
+      weekLabel: (ov && ov.weekLabel) || base.weekLabel,
+      title: (ov && ov.title) || base.title,
+      playNames: ov && ov.playNames && ov.playNames.length ? ov.playNames : base.playNames,
+    };
+    const bp = buildWeekCardBlueprint(wk, PACK);
+    const tpl = buildEditableWeekCardTemplate(bp, wk);
+    setLayers(JSON.parse(JSON.stringify(tpl.layers)));
+    setCardCanvas(tpl.canvas);
+    setSelectedId(null);
+    setGenByLayer({});
   };
 
   const template = { name: `${week.weekLabel} ${week.title}`, canvas: cardCanvas, background: { color: PACK.bg, radius: 28 }, layers };
@@ -288,7 +309,7 @@ export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard
   const smallBtn: React.CSSProperties = { padding: "4px 10px", borderRadius: 7, border: "1px solid #E8862B", background: "#fff", color: "#E8862B", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#efe9e0", padding: 28, paddingBottom: 120, fontFamily: "system-ui, sans-serif", boxSizing: "border-box" }}>
+    <div style={{ minHeight: embedded ? "100%" : "100vh", background: embedded ? "transparent" : "#efe9e0", padding: embedded ? "20px 20px 0" : 28, paddingBottom: embedded ? 0 : 120, fontFamily: "system-ui, sans-serif", boxSizing: "border-box" }}>
       <div style={{ maxWidth: 1180, margin: "0 auto" }}>
         <h2 style={{ margin: "0 0 4px", color: "#3f3833", fontSize: 18 }}>
           {richEdit
@@ -344,8 +365,8 @@ export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          <WeekCardEditor ref={stageRef} template={template} selectedId={selectedId} onSelect={setSelectedId} onUpdateLayer={updateLayer} width={740} />
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <WeekCardEditor ref={stageRef} template={template} selectedId={selectedId} onSelect={setSelectedId} onUpdateLayer={updateLayer} width={embedded ? 560 : 740} />
           <div style={{ width: 210, flexShrink: 0 }}>
             <PropertyPanel
               layer={selected}
@@ -368,7 +389,13 @@ export default function WeekCardBlueprintTest({ richEdit = false, onPlaceOnBoard
       </div>
 
       {/* 플로팅 버튼 */}
-      <div style={{ position: "fixed", right: 24, bottom: 24, display: "flex", flexDirection: "column", gap: 10, zIndex: 1000 }}>
+      <div style={embedded
+        ? { position: "sticky", bottom: 0, display: "flex", flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 10, zIndex: 1000, padding: "12px 4px 4px", marginTop: 8, background: "linear-gradient(180deg, rgba(239,233,224,0) 0%, #efe9e0 36%)" }
+        : { position: "fixed", right: 24, bottom: 24, display: "flex", flexDirection: "column", gap: 10, zIndex: 1000 }}>
+        <button onClick={applyBlueprintVersion} title="이 주차를 블루프린트 레이아웃(1080² · 좌 텍스트 + 우 대표/서브 이미지)으로 전환"
+          style={{ padding: "11px 18px", borderRadius: 26, border: "1px solid #5B53A8", background: "#fff", color: "#5B53A8", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(0,0,0,0.12)" }}>
+          🧱 블루프린트 버전
+        </button>
         {!richEdit && (
           <button onClick={generateAllSlots} disabled={anyLoading} title="작품 사진 3장을 생성(레퍼런스 있으면 그 분위기로 컨디셔닝). 슬롯별 생성은 우측 속성 패널에서."
             style={{ padding: "11px 18px", borderRadius: 26, border: "none", background: anyLoading ? "#e0a878" : "#E8862B", color: "#fff", fontSize: 14, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 18px rgba(232,134,43,0.4)" }}>

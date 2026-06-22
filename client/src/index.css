@@ -1,5 +1,14 @@
+/* ── Theme Design System 폰트 (로컬 /fonts) ── */
+/* 본문: SUIT */
+@font-face { font-family: "SUIT"; font-weight: 400; font-display: swap; src: url("/fonts/SUIT-Regular.ttf") format("truetype"); }
+@font-face { font-family: "SUIT"; font-weight: 700; font-display: swap; src: url("/fonts/SUIT-Bold.ttf") format("truetype"); }
+@font-face { font-family: "SUIT"; font-weight: 800; font-display: swap; src: url("/fonts/SUIT-ExtraBold.ttf") format("truetype"); }
+/* 제목: Black Han Sans (ONE Mobile POP 미확보 시 폴백, 두꺼운 둥근 POP 느낌) */
+@font-face { font-family: "Black Han Sans"; font-weight: 400; font-display: swap; src: url("/fonts/BlackHanSans-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Jua"; font-weight: 400; font-display: swap; src: url("/fonts/Jua-Regular.ttf") format("truetype"); }
+
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "SUIT", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: #2b2622;
   background: #faf8f5;
 }

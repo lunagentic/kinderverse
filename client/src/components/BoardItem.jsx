@@ -1,5 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Rnd } from "react-rnd";
+import { cutout as runCutout } from "../editor/cutout";
 import { X, FileText, Image as ImageIcon, Palette, LayoutGrid } from "lucide-react";
 import PlanView from "./PlanView.jsx";
 import Loader from "./Loader.jsx";
@@ -516,18 +517,32 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
   const overlaps = (a, b) =>
     a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-  // 겹친 레이어 위에서 클릭(드래그 아님) → 현재 레이어를 뒤로 보내고 아래 레이어 선택
-  const cycleStack = (id) => {
+  // 겹친 레이어 위에서 클릭(드래그 아님) → 순서는 그대로 두고 "아래 겹친 요소"를 선택만 (비파괴)
+  const cycleSelect = (id) => {
     const cur = elements.find((e) => e.id === id);
     if (!cur) return;
-    const peers = elements.filter((e) => e.id !== id && !e.locked && overlaps(e, cur));
-    if (!peers.length) return; // 겹친 레이어 없음 → 순서 그대로
-    const next = peers[peers.length - 1]; // 배열상 가장 위(시각적 최상단) 겹친 레이어
-    const without = elements.filter((e) => e.id !== id);
-    let at = 0;
-    while (at < without.length && without[at].locked) at++; // 배경(잠금) 레이어 위로
-    onChange?.({ elements: [...without.slice(0, at), cur, ...without.slice(at)] });
+    // 겹치고 잠금 아닌 요소들을 배열(시각 아래→위) 순서로. cur 포함.
+    const stack = elements.filter((e) => !e.locked && overlaps(e, cur));
+    if (stack.length <= 1) return; // 겹친 게 없으면 선택 유지
+    const idx = stack.findIndex((e) => e.id === id);
+    const next = stack[(idx - 1 + stack.length) % stack.length]; // 시각적으로 바로 아래로 순환
     setActiveId(next.id);
+  };
+
+  // 명시적 z-순서 변경 (잠금 배경은 항상 최하단 유지)
+  const reorder = (id, where) => {
+    const cur = elements.find((e) => e.id === id);
+    if (!cur || cur.locked) return;
+    const rest = elements.filter((e) => e.id !== id);
+    let lo = 0; // 잠금(배경) 레이어 개수 = 이동 가능한 하한
+    while (lo < rest.length && rest[lo].locked) lo++;
+    const curIdx = elements.findIndex((e) => e.id === id);
+    let at;
+    if (where === "front") at = rest.length;
+    else if (where === "back") at = lo;
+    else if (where === "forward") at = Math.min(rest.length, curIdx + 1);
+    else at = Math.max(lo, curIdx - 1); // backward
+    onChange?.({ elements: [...rest.slice(0, at), cur, ...rest.slice(at)] });
   };
 
   const rndScale = scale * (zoom || 1);
@@ -554,7 +569,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
                 active={activeId === el.id}
                 editing={editId === el.id}
                 onSelect={() => setActiveId(el.id)}
-                onCycle={() => cycleStack(el.id)}
+                onCycle={() => cycleSelect(el.id)}
                 onEdit={() => setEditId(el.id)}
                 onEndEdit={() => setEditId(null)}
                 onChange={(p) => updateEl(el.id, p)}
@@ -571,6 +586,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
         <ControlPanel
           el={activeEl}
           onChange={(p) => updateEl(activeEl.id, p)}
+          onReorder={(where) => reorder(activeEl.id, where)}
           onRemove={() => {
             removeEl(activeEl.id);
             setActiveId(null);
@@ -583,7 +599,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
 }
 
 // ── 우측 고정 컨트롤 패널 (선택된 요소 1개를 한 곳에서 편집) ──
-function ControlPanel({ el, onChange, onRemove, onClose }) {
+function ControlPanel({ el, onChange, onReorder, onRemove, onClose }) {
   const s = el.style || {};
   const isText = el.type === "text";
   const isImage = el.type === "image" || el.type === "photo";
@@ -725,6 +741,19 @@ function ControlPanel({ el, onChange, onRemove, onClose }) {
         </div>
       )}
 
+      {/* 레이어 순서 (z-order) */}
+      {onReorder && (
+        <div className="dpanel-sec">
+          <div className="dpanel-label">레이어 순서</div>
+          <div className="dpanel-btn-row">
+            <button className="dpanel-size" title="맨 앞으로" onClick={() => onReorder("front")}>⤒ 맨 앞</button>
+            <button className="dpanel-size" title="앞으로" onClick={() => onReorder("forward")}>↑ 앞</button>
+            <button className="dpanel-size" title="뒤로" onClick={() => onReorder("backward")}>↓ 뒤</button>
+            <button className="dpanel-size" title="맨 뒤로" onClick={() => onReorder("back")}>⤓ 맨 뒤</button>
+          </div>
+        </div>
+      )}
+
       <div className="dpanel-btn-row" style={{ marginTop: "auto" }}>
         <button
           className={"dpanel-size" + (el.hidden ? " on" : "")}
@@ -765,9 +794,13 @@ function elTextStyle(s = {}) {
   return st;
 }
 
-// 유아 친화 대표 폰트 3종 (index.html 에서 로드)
+// 유아 친화 대표 폰트 (index.html / index.css 에서 로드)
 const FONTS = [
+  { name: "팝(ONE Mobile POP)", css: "'ONE Mobile POP', sans-serif" },
+  { name: "둥근(Cafe24)", css: "'Cafe24Ssurround', sans-serif" },
   { name: "동글(Jua)", css: "'Jua', sans-serif" },
+  { name: "굵은둥근(Black Han Sans)", css: "'Black Han Sans', sans-serif" },
+  { name: "본문(SUIT)", css: "'SUIT', sans-serif" },
   { name: "손글씨(Gaegu)", css: "'Gaegu', cursive" },
   { name: "굵은(Do Hyeon)", css: "'Do Hyeon', sans-serif" },
 ];
@@ -811,6 +844,27 @@ const COLOR_GROUPS = [
   },
 ];
 
+// 누끼(배경 제거) 이미지 — el.cutout 일 때만 사용. 브라우저 flood-fill 결과를 캐시.
+function CutoutImg({ src, fit, style }) {
+  const [shown, setShown] = useState(src);
+  useEffect(() => {
+    let alive = true;
+    setShown(src);
+    if (src) runCutout(src).then((out) => { if (alive) setShown(out); }).catch(() => {});
+    return () => { alive = false; };
+  }, [src]);
+  return (
+    <img
+      src={shown}
+      alt=""
+      draggable={false}
+      style={{ ...style, objectFit: fit }}
+      onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+      onLoad={(e) => { e.currentTarget.style.visibility = "visible"; }}
+    />
+  );
+}
+
 function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onChange }) {
   const s = el.style || {};
   const fill = { width: "100%", height: "100%", boxSizing: "border-box" };
@@ -820,17 +874,21 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
 
   let inner;
   if (el.type === "shape") {
-    inner = <div style={{ ...fill, background: s.bg, borderRadius: s.radius || 0 }} />;
+    inner = <div style={{ ...fill, background: s.bg, borderRadius: s.radius || 0, border: s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined, boxShadow: s.shadow }} />;
   } else if (isImage) {
     inner = el.src ? (
-      <img
-        src={el.src}
-        alt=""
-        draggable={false}
-        style={{ ...fill, objectFit: el.fit || "contain", borderRadius: 12 }}
-        onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
-        onLoad={(e) => { e.currentTarget.style.visibility = "visible"; }}
-      />
+      el.cutout ? (
+        <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...fill, borderRadius: 12 }} />
+      ) : (
+        <img
+          src={el.src}
+          alt=""
+          draggable={false}
+          style={{ ...fill, objectFit: el.fit || "contain", borderRadius: 12 }}
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+          onLoad={(e) => { e.currentTarget.style.visibility = "visible"; }}
+        />
+      )
     ) : (
       <div className="dframe-imgph" style={fill}>{el.type === "photo" ? "사진 자리" : "이미지 자리"}</div>
     );
@@ -893,17 +951,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
               }
             : undefined
         }
-        onClick={() => {
-          // 드래그가 아닌 '제자리 클릭'이고 이미 선택된 상태일 때만 → 겹친 레이어 순서 변경
-          if (!active || draggedRef.current) return;
-          if (el.type === "text") {
-            // 더블클릭(편집)과 구분: 잠깐 대기 후 단일 클릭이면 순서 변경
-            clearTimeout(clickTimer.current);
-            clickTimer.current = setTimeout(() => onCycle?.(), 230);
-          } else {
-            onCycle?.();
-          }
-        }}
+        /* 클릭 = 그 요소를 '선택만' (레이어 순서·순환 변경 없음). 순서 변경은 패널의 레이어 버튼으로만. */
       >
         {inner}
       </div>
@@ -923,7 +971,7 @@ function DesignEl({ el }) {
   const s = el.style || {};
 
   if (el.type === "shape") {
-    return <div style={{ ...base, background: s.bg, borderRadius: s.radius || 0, opacity: s.opacity ?? 1 }} />;
+    return <div style={{ ...base, boxSizing: "border-box", background: s.bg, borderRadius: s.radius || 0, opacity: s.opacity ?? 1, border: s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined, boxShadow: s.shadow }} />;
   }
   if (el.type === "text") {
     return (
@@ -941,6 +989,9 @@ function DesignEl({ el }) {
   }
   if (el.type === "image" || el.type === "photo") {
     if (el.src) {
+      if (el.cutout) {
+        return <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...base, borderRadius: 12, opacity: s.opacity ?? 1 }} />;
+      }
       return (
         <img
           src={el.src}

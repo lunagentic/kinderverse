@@ -12,6 +12,7 @@ export interface DesignDocElement {
   src?: string;
   prompt?: string;
   fit?: string;
+  cutout?: boolean; // 이미지 배경 누끼(흰/밝은 배경 투명화) 적용
   locked?: boolean;
   hidden?: boolean; // 편집 중 숨김 (정적/최종 출력 제외)
   textRole?: "title" | "content";
@@ -27,6 +28,7 @@ export interface DesignDocElement {
     opacity?: number;
     stroke?: string;
     strokeWidth?: number;
+    shadow?: string;
   };
   // 에디터는 무시하지만 역동기화를 위해 보존
   binding?: { sectionId: string; path: string };

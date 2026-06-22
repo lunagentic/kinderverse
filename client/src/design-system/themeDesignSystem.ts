@@ -12,7 +12,14 @@
 import type { ThemeFamily } from "../design-recipe";
 
 export const TITLE_FONT = "'ONE Mobile POP', 'Black Han Sans', 'Jua', sans-serif";
+// 소제목: 제목과 동일 계열(ONE Mobile POP) — Cafe24 이전 폰트
+export const SUBTITLE_FONT = "'ONE Mobile POP', 'Black Han Sans', 'Jua', sans-serif";
 export const BODY_FONT = "'SUIT', 'Pretendard', system-ui, sans-serif";
+
+// 카드 완성도 — 부드러운 그림자 + 얇은 테두리(섹션 accent) 기준값
+export const CARD_SHADOW = "0 12px 30px rgba(31, 40, 51, 0.14)";
+export const CARD_BORDER_WIDTH = 2;
+export const HERO_SHADOW = "0 16px 36px rgba(31, 40, 51, 0.18)";
 
 /** 테마 컬러 팔레트 (메인/포인트/보조/배경) */
 export interface ThemePalette {

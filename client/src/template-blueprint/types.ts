@@ -36,6 +36,8 @@ export interface TextStyle {
   color?: string;
   align?: "left" | "center" | "right";
   fontFamily?: string;
+  stroke?: string;
+  strokeWidth?: number;
 }
 
 export interface ShapeStyle {
@@ -44,6 +46,8 @@ export interface ShapeStyle {
   strokeWidth?: number;
   radius?: number;
   opacity?: number;
+  /** CSS box-shadow 문자열 (카드 입체감) */
+  shadow?: string;
 }
 
 // ── 레이어 안에 들어가는 개별 편집 요소 (TemplateElement) ──
@@ -105,7 +109,7 @@ export type TemplateElement =
 
 // ── Asset Slot — Asset Catalog 의 에셋을 assetId 로 참조하는 연결 슬롯 ──
 // (단순 assetKey 문자열이 아니라 assetId + assetFamily 참조 구조)
-export type AssetRole = "character" | "object" | "decoration" | "icon";
+export type AssetRole = "character" | "object" | "decoration" | "icon" | "background";
 
 export interface AssetSlot {
   id: string;

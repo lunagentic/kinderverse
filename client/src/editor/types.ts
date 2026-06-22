@@ -19,6 +19,7 @@ export interface EditorNode {
   fill?: string;
   radius?: number;
   opacity?: number;
+  shadow?: string;
   // image (asset)
   assetId?: string;
   assetFamily?: string;
@@ -31,6 +32,8 @@ export interface EditorNode {
   weight?: number;
   align?: string;
   fontFamily?: string;
+  stroke?: string;
+  strokeWidth?: number;
 }
 
 export interface EditorDoc {

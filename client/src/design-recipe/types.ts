@@ -31,6 +31,12 @@ export interface LayoutRecipe {
   sections: string[];
 }
 
+/** 주차 한 칸 — 소주제 + 놀이명 목록 */
+export interface MonthlyWeek {
+  title: string; // 소주제 (여름과 날씨)
+  plays: string[]; // 놀이명들 (여름 날씨 알아보기 …)
+}
+
 /** Blueprint 텍스트에 채울 실제 콘텐츠 (payload 연결 시 채워짐, 없으면 레퍼런스 기본값) */
 export interface MonthlyContent {
   title: string; // 대표 주제 (여름이 왔어요)
@@ -38,10 +44,13 @@ export interface MonthlyContent {
   month: string; // 6월
   theme: string; // 생활주제 : 여름
   reasonTitle: string;
+  reasonBody: string; // 놀이 선정 이유 본문
   flowTitle: string;
-  expectationTitle: string;
-  elementTitle: string;
-  weeks: string[]; // 주차 소주제 4개
+  weeks: MonthlyWeek[]; // 주차별 소주제 + 놀이명
+  eventsTitle: string; // 이달의 행사
+  events: string[]; // 행사 항목들
+  expectationTitle: string; // 교사의 기대
+  expectations: string[]; // 교사의 기대 항목들
 }
 
 /** Design Recipe Engine 의 최종 산출물 */

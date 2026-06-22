@@ -17,17 +17,31 @@ function contentFromPayload(payload: unknown): { content: MonthlyContent; themeT
     const vm = normalizeMonthlyPlan(payload as MonthlyPlanRawData);
     const b = vm.basicInfo;
     if (!b?.theme && !(vm.weeklyFlow && vm.weeklyFlow.length)) return null;
-    const weeks = (vm.weeklyFlow || []).slice(0, 4).map((w) => w.subTheme).filter(Boolean);
+    const weeks = (vm.weeklyFlow || []).slice(0, 4).map((w) => ({
+      title: w.subTheme || `${w.week}주`,
+      plays: (w.plays || []).map((p) => p.title).filter(Boolean).slice(0, 4),
+    }));
+    const events = (vm.events || [])
+      .map((e) => (e.date ? `${e.name} (${e.date})` : e.name))
+      .filter(Boolean)
+      .slice(0, 4);
+    const expectations = (vm.teacherExpectations || [])
+      .map((e) => (e.focus ? `${e.goal} — ${e.focus}` : e.goal))
+      .filter(Boolean)
+      .slice(0, 4);
     const content: MonthlyContent = {
       title: b.theme || "이달의 놀이",
       age: b.ageBand ? `연령 ${b.ageBand}` : "연령",
       month: b.periodLabel || "",
       theme: b.lifeTheme ? `생활주제 : ${b.lifeTheme}` : "생활주제",
       reasonTitle: "놀이 선정 이유",
+      reasonBody: vm.rationale?.summary || "",
       flowTitle: "이달의 놀이 흐름",
+      weeks: weeks.length ? weeks : [],
+      eventsTitle: "이달의 행사",
+      events,
       expectationTitle: "교사의 기대",
-      elementTitle: "주요 놀이 요소",
-      weeks: weeks.length ? weeks : ["1주", "2주", "3주", "4주"],
+      expectations,
     };
     return { content, themeText: b.theme || b.lifeTheme || b.season || "" };
   } catch {

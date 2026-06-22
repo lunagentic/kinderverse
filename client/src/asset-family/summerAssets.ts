@@ -19,6 +19,7 @@ export const summerAssetFamily: AssetCatalog = {
   // ── 배경 ──
   backgrounds: [
     a("background", "summer_sky", ["summer", "sky", "weather", "hero", "week1"]),
+    a("background", "summer_hero_bg", ["summer", "hero", "scene", "landscape", "village", "background"]),
     a("background", "summer_hill", ["summer", "nature", "outdoor", "hill"]),
     a("background", "summer_lake", ["summer", "water", "lake", "week3"]),
   ],
@@ -32,12 +33,19 @@ export const summerAssetFamily: AssetCatalog = {
     a("character", "summer_dragonfly", ["creature", "insect", "summer", "생물", "week2"]),
     a("character", "summer_water_child", ["person", "child", "water", "week3"]),
     a("character", "summer_teacher", ["person", "teacher", "adult", "guide", "expectation"]),
+    a("character", "summer_teacher_notepad", ["person", "teacher", "adult", "notepad", "half_body", "expectation"]),
   ],
 
   // ── 스티커 (사물 오브젝트) ──
   stickers: [
     a("sticker", "summer_sun", ["summer", "weather", "sky", "hero", "week1"]),
     a("sticker", "summer_cloud", ["summer", "weather", "sky", "hero", "week1"]),
+    // ── Hero Scene Recipe v1 (배경 장면 구성요소) ──
+    a("sticker", "summer_eco_house", ["summer", "hero", "scene", "building", "signature", "landmark"]),
+    a("sticker", "summer_windmill", ["summer", "hero", "scene", "sky_object"]),
+    a("sticker", "summer_tree", ["summer", "hero", "scene", "landscape", "nature"]),
+    a("sticker", "summer_bush", ["summer", "hero", "scene", "landscape", "nature"]),
+    a("sticker", "summer_ground", ["summer", "hero", "scene", "foreground", "ground"]),
     a("sticker", "summer_sun_sunglasses", ["summer", "weather", "fun", "week1"]),
     a("sticker", "summer_rain_cloud", ["summer", "weather", "rain", "week2"]),
     a("sticker", "summer_sandcastle", ["summer", "beach", "play", "play_reason"]),

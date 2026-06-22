@@ -12,6 +12,7 @@ import {
 } from "./renderer/pipeline";
 import { toDesignDoc } from "./renderer/adapters/toDesignDoc";
 import { CanvasEditor } from "./editor/CanvasEditor";
+import { editorDocToDesignDoc } from "./editor/blueprintToDoc";
 import "./board.css";
 
 // 여러 디자인 문서를 가로로 나란히 합쳐 하나의 DesignDoc 으로 (한번에 보기)
@@ -393,17 +394,18 @@ function Workspace() {
       return;
     }
 
-    // 월안 "편집 템플릿"(Phase 5): 실제 월안 JSON → DesignRecipe → Blueprint → 캔버스 에디터
+    // 월안 "편집 템플릿"(Phase 5): 실제 월안 JSON → DesignRecipe → Blueprint → 보드 위 편집 가능 카드
     if (format === "editTemplate" && item.data?.feature_id === "monthly_plan") {
       const payload = item.data?.payload;
       const b = payload?.basic_info || {};
-      setEditorInput({
+      const designDoc = editorDocToDesignDoc({
         type: "monthly_plan",
         theme: b.theme || item.data?.title || "월간 놀이계획",
         age: b.age_band || "",
         month: b.period?.label || "",
         payload,
       });
+      addDesignDoc(designDoc, 480); // 보드에 편집 가능한 카드로 배치 (요소별 클릭 편집)
       return;
     }
 
@@ -499,12 +501,10 @@ function Workspace() {
     }
   }, []);
 
-  if (editorInput) {
-    return <CanvasEditor input={editorInput} onClose={() => setEditorInput(null)} />;
-  }
-
   return (
     <div className={"layout" + (chatOpen ? " chat-open" : "")}>
+      {/* 편집 디자인 에디터 — 보드 위에 오버레이로 표시 (보드는 뒤에 유지) */}
+      {editorInput && <CanvasEditor input={editorInput} onClose={() => setEditorInput(null)} />}
       <Board
         ref={boardRef}
         items={items}

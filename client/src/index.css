@@ -3,7 +3,11 @@
 @font-face { font-family: "SUIT"; font-weight: 400; font-display: swap; src: url("/fonts/SUIT-Regular.ttf") format("truetype"); }
 @font-face { font-family: "SUIT"; font-weight: 700; font-display: swap; src: url("/fonts/SUIT-Bold.ttf") format("truetype"); }
 @font-face { font-family: "SUIT"; font-weight: 800; font-display: swap; src: url("/fonts/SUIT-ExtraBold.ttf") format("truetype"); }
-/* 제목: Black Han Sans (ONE Mobile POP 미확보 시 폴백, 두꺼운 둥근 POP 느낌) */
+/* 제목: ONE Mobile POP (둥근 팝체 — 레퍼런스 제목 폰트) */
+@font-face { font-family: "ONE Mobile POP"; font-weight: 400; font-display: swap; src: url("/fonts/ONEMobilePOP.woff") format("woff"); }
+/* 소제목: Cafe24 Ssurround (둥글둥글 매력 볼드 — 배지 제목) */
+@font-face { font-family: "Cafe24Ssurround"; font-weight: 700; font-display: swap; src: url("/fonts/Cafe24Ssurround.woff") format("woff"); }
+/* 제목 폴백 */
 @font-face { font-family: "Black Han Sans"; font-weight: 400; font-display: swap; src: url("/fonts/BlackHanSans-Regular.ttf") format("truetype"); }
 @font-face { font-family: "Jua"; font-weight: 400; font-display: swap; src: url("/fonts/Jua-Regular.ttf") format("truetype"); }
 

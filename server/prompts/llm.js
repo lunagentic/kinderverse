@@ -4,6 +4,11 @@
 //   3) 둘 다 없으면 null 반환 → 호출부가 스키마 기반 목업으로 폴백
 
 export function activeProvider() {
+  // 텍스트 LLM provider 명시적 지정 (LLM_PROVIDER=anthropic|openai). 키 있을 때만 적용.
+  const forced = (process.env.LLM_PROVIDER || "").toLowerCase();
+  if (forced === "anthropic" && process.env.ANTHROPIC_API_KEY) return "anthropic";
+  if (forced === "openai" && process.env.OPENAI_API_KEY) return "openai";
+  // 미지정 시 기존 우선순위
   if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   return null;
@@ -67,7 +72,7 @@ async function callAnthropic({ system, user }) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: 8192, // 월안 JSON 분량 여유
       system,
       messages: [{ role: "user", content: user }],
     }),

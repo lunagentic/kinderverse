@@ -22,11 +22,26 @@ export interface DesignRecipeInput {
   theme: string; // 예: "여름이 왔어요"
   age?: string; // 예: "3~5세"
   month?: string; // 예: "6월"
+  /** (Phase 5) 실제 월안 JSON(MonthlyPlanRawData). 있으면 content 를 데이터로 채운다. */
+  payload?: unknown;
 }
 
 /** 레이아웃 레시피 — 어떤 섹션을 어떤 순서로 둘지 */
 export interface LayoutRecipe {
   sections: string[];
+}
+
+/** Blueprint 텍스트에 채울 실제 콘텐츠 (payload 연결 시 채워짐, 없으면 레퍼런스 기본값) */
+export interface MonthlyContent {
+  title: string; // 대표 주제 (여름이 왔어요)
+  age: string; // 연령 3~5세
+  month: string; // 6월
+  theme: string; // 생활주제 : 여름
+  reasonTitle: string;
+  flowTitle: string;
+  expectationTitle: string;
+  elementTitle: string;
+  weeks: string[]; // 주차 소주제 4개
 }
 
 /** Design Recipe Engine 의 최종 산출물 */
@@ -35,4 +50,6 @@ export interface DesignRecipe {
   themeFamily: ThemeFamily;
   styleFamily: StyleFamily;
   layoutRecipe: LayoutRecipe;
+  /** (Phase 5) 실제 데이터 콘텐츠 — 없으면 Blueprint 가 레퍼런스 기본값 사용 */
+  content?: MonthlyContent;
 }

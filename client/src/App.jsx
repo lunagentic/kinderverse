@@ -144,6 +144,7 @@ export default function App() {
 
 function Workspace() {
   const [items, setItems] = useState([]);
+  const [editorInput, setEditorInput] = useState(null); // 캔버스 디자인 에디터(Phase 4/5) 입력
   const [selectedIds, setSelectedIds] = useState([]); // 복수 선택
   const setSelectedId = (id) => setSelectedIds(id == null ? [] : [id]);
   // Shift 등으로 추가 선택 토글
@@ -392,6 +393,20 @@ function Workspace() {
       return;
     }
 
+    // 월안 "편집 템플릿"(Phase 5): 실제 월안 JSON → DesignRecipe → Blueprint → 캔버스 에디터
+    if (format === "editTemplate" && item.data?.feature_id === "monthly_plan") {
+      const payload = item.data?.payload;
+      const b = payload?.basic_info || {};
+      setEditorInput({
+        type: "monthly_plan",
+        theme: b.theme || item.data?.title || "월간 놀이계획",
+        age: b.age_band || "",
+        month: b.period?.label || "",
+        payload,
+      });
+      return;
+    }
+
     // 월안 "이미지": 인포그래픽 포스터 1장 (월안 → gpt-image → 이미지)
     // format "image" = v1, "imageV2" = v2 (프롬프트 버전만 다름)
     if ((format === "image" || format === "imageV2") && item.data?.feature_id === "monthly_plan") {
@@ -483,6 +498,10 @@ function Workspace() {
       /* 변환 실패 시 무시 */
     }
   }, []);
+
+  if (editorInput) {
+    return <CanvasEditor input={editorInput} onClose={() => setEditorInput(null)} />;
+  }
 
   return (
     <div className={"layout" + (chatOpen ? " chat-open" : "")}>

@@ -1,96 +1,138 @@
 // =============================================================================
-// Theme Design System — 계절별 디자인 토큰(팔레트 · 배지 · 주차색 · 타이포그래피)
-// + Sticker size-tier 정규화. monthlyPlanBlueprint 가 단일 출처로 참조한다.
-// "에셋 나열형" → "디자인 시스템 기반" 전환의 핵심 모듈.
+// Theme Design System — 월안 템플릿 색상/타이포 규칙 (디자인 가이드 기준).
+//
+// 규칙(가이드):
+//  - 테마 컬러 팔레트: 메인/포인트/보조1/보조2/배경 (계절별)
+//  - 섹션 컬러 시스템(공통 구조): 모든 테마 동일한 섹션 hue
+//      01 놀이 선정 이유 → 핑크 / 02 이달의 놀이 흐름 → 블루
+//      03 교사의 기대 → 그린 / 04 주요 놀이 요소 → 퍼플
+//  - 섹션 배경은 "연한 톤"(가독성), 콘텐츠(텍스트/배지)는 "진한 색"으로 대비
+//  - 제목 폰트 ONE Mobile POP(폴백), 본문 SUIT
 // =============================================================================
 import type { ThemeFamily } from "../design-recipe";
 
-// ── 폰트 스택 (제목 ONE Mobile POP → 폴백 / 본문 SUIT) ──
-//   ONE Mobile POP .ttf 를 client/public/fonts 에 넣으면 자동으로 1순위 적용됨.
 export const TITLE_FONT = "'ONE Mobile POP', 'Black Han Sans', 'Jua', sans-serif";
 export const BODY_FONT = "'SUIT', 'Pretendard', system-ui, sans-serif";
 
-export interface BadgeStyle {
-  fill: string;
-  text: string;
+/** 테마 컬러 팔레트 (메인/포인트/보조/배경) */
+export interface ThemePalette {
+  main: string;
+  point: string;
+  sub1: string;
+  sub2: string;
+  bg: string;
+}
+
+/** 섹션 색: 연한 배경(bg) + 진한 강조(accent, 배지/번호/제목) */
+export interface SectionColor {
+  bg: string;
+  accent: string;
 }
 
 export interface SeasonTheme {
-  // 캔버스/카드 팔레트
-  bg: string;
-  card: string;
+  palette: ThemePalette;
+  bg: string; // 캔버스 배경 = palette.bg
+  card: string; // 흰 카드 기본값
   ink: string;
   sub: string;
-  // Hero
-  heroBg: string;
-  heroAccent: string;
-  heroTitle: string;
-  // 섹션 제목 배지 (놀이선정이유 / 이달의놀이흐름 / 교사의기대 / 주요놀이요소)
-  badges: {
-    reason: BadgeStyle;
-    flow: BadgeStyle;
-    expectation: BadgeStyle;
-    element: BadgeStyle;
+  hero: { bg: string; accent: string; title: string };
+  // 섹션 컬러 시스템 (놀이선정이유/이달의놀이흐름/교사의기대/주요놀이요소)
+  sections: {
+    reason: SectionColor;
+    flow: SectionColor;
+    expectation: SectionColor;
+    element: SectionColor;
   };
-  // 주차 카드 색 (1~4주) — 카드 배경틴트 + 번호배지/제목 액센트
+  // 주차 카드(1~4주) 색 — flow 섹션 내부
   weeks: { tint: string; accent: string }[];
 }
 
-const W = (text: string) => ({ fill: "#FFFFFF", text });
+// 섹션 강조색(공통 hue, 진한 톤 — 가이드의 계열)
+const ACCENT = { reason: "#F2728E", flow: "#4F9BE0", expectation: "#5BB87A", element: "#9A7FD6" };
 
 export const THEME_SYSTEM: Record<ThemeFamily, SeasonTheme> = {
   summer: {
-    bg: "#EAF6FF", card: "#FFFFFF", ink: "#3F3833", sub: "#8A8078",
-    heroBg: "#7EC8F2", heroAccent: "#1E63B0", heroTitle: "#E8412E",
-    badges: { reason: W("#F4756B"), flow: W("#4F9BE0"), expectation: W("#5BC08A"), element: W("#4F9BE0") },
+    palette: { main: "#4AA8FF", point: "#FFB84D", sub1: "#6ED97A", sub2: "#BDA4FF", bg: "#FFF8EE" },
+    bg: "#FFF8EE", card: "#FFFFFF", ink: "#3F3833", sub: "#8A8078",
+    hero: { bg: "#4AA8FF", accent: "#1E63B0", title: "#FFFFFF" },
+    sections: {
+      reason: { bg: "#FFE6EC", accent: ACCENT.reason },
+      flow: { bg: "#E6F3FF", accent: ACCENT.flow },
+      expectation: { bg: "#E9F8E9", accent: ACCENT.expectation },
+      element: { bg: "#F0E6FF", accent: ACCENT.element },
+    },
     weeks: [
-      { tint: "#FDEDEF", accent: "#EE6F8A" }, // 1주 핑크
-      { tint: "#E9F7EE", accent: "#3FB37A" }, // 2주 그린
-      { tint: "#F0EBFB", accent: "#8A6FD6" }, // 3주 퍼플
-      { tint: "#FFF1E2", accent: "#F0913E" }, // 4주 오렌지
+      { tint: "#FFE6EC", accent: ACCENT.reason },
+      { tint: "#E9F8E9", accent: ACCENT.expectation },
+      { tint: "#F0E6FF", accent: ACCENT.element },
+      { tint: "#FFF1E2", accent: "#F0913E" },
     ],
   },
   autumn: {
-    bg: "#FFF4E4", card: "#FFFFFF", ink: "#4A3B2E", sub: "#9A8676",
-    heroBg: "#F4B860", heroAccent: "#9A4B16", heroTitle: "#D2691E",
-    badges: { reason: W("#D9683B"), flow: W("#C8893B"), expectation: W("#8AA65A"), element: W("#C8893B") },
+    palette: { main: "#FF8C42", point: "#FFC857", sub1: "#7CB342", sub2: "#A67C52", bg: "#FFF6EC" },
+    bg: "#FFF6EC", card: "#FFFFFF", ink: "#4A3B2E", sub: "#9A8676",
+    hero: { bg: "#FF8C42", accent: "#9A4B16", title: "#FFFFFF" },
+    sections: {
+      reason: { bg: "#FFE9E6", accent: ACCENT.reason },
+      flow: { bg: "#E6F0FF", accent: ACCENT.flow },
+      expectation: { bg: "#ECF6E6", accent: ACCENT.expectation },
+      element: { bg: "#F3E6FF", accent: ACCENT.element },
+    },
     weeks: [
-      { tint: "#FDEDEF", accent: "#E0607E" },
-      { tint: "#EEF6E5", accent: "#7FA64E" },
-      { tint: "#F0EBFB", accent: "#8A6FD6" },
+      { tint: "#FFE9E6", accent: ACCENT.reason },
+      { tint: "#ECF6E6", accent: ACCENT.expectation },
+      { tint: "#F3E6FF", accent: ACCENT.element },
       { tint: "#FFF0DD", accent: "#E08A3C" },
     ],
   },
   spring: {
-    bg: "#FBF1F6", card: "#FFFFFF", ink: "#3F3340", sub: "#9A8794",
-    heroBg: "#F7B7D2", heroAccent: "#B43E70", heroTitle: "#E0578E",
-    badges: { reason: W("#E07A9B"), flow: W("#6FB0E0"), expectation: W("#7BC47B"), element: W("#6FB0E0") },
+    palette: { main: "#FF9EC4", point: "#FFD166", sub1: "#9BD96E", sub2: "#BDA4FF", bg: "#FFF6FA" },
+    bg: "#FFF6FA", card: "#FFFFFF", ink: "#3F3340", sub: "#9A8794",
+    hero: { bg: "#FF9EC4", accent: "#B43E70", title: "#FFFFFF" },
+    sections: {
+      reason: { bg: "#FFE6EC", accent: ACCENT.reason },
+      flow: { bg: "#E6F3FF", accent: ACCENT.flow },
+      expectation: { bg: "#E9F8E9", accent: ACCENT.expectation },
+      element: { bg: "#F0E6FF", accent: ACCENT.element },
+    },
     weeks: [
-      { tint: "#FDEDF3", accent: "#E36F9E" },
-      { tint: "#E9F7EE", accent: "#5FB87E" },
-      { tint: "#F0EBFB", accent: "#9A7FD6" },
+      { tint: "#FFE6EC", accent: ACCENT.reason },
+      { tint: "#E9F8E9", accent: ACCENT.expectation },
+      { tint: "#F0E6FF", accent: ACCENT.element },
       { tint: "#FFF3DE", accent: "#F0A53E" },
     ],
   },
   winter: {
-    bg: "#EEF4FB", card: "#FFFFFF", ink: "#2E3B4A", sub: "#7E8A9A",
-    heroBg: "#A8D0F0", heroAccent: "#2E5B86", heroTitle: "#3E7AB0",
-    badges: { reason: W("#5B8FB9"), flow: W("#6FA0D0"), expectation: W("#6FB8C0"), element: W("#6FA0D0") },
+    palette: { main: "#5BB0E8", point: "#9AD0F0", sub1: "#A8D8E8", sub2: "#BDA4FF", bg: "#F2F8FF" },
+    bg: "#F2F8FF", card: "#FFFFFF", ink: "#2E3B4A", sub: "#7E8A9A",
+    hero: { bg: "#5BB0E8", accent: "#2E5B86", title: "#FFFFFF" },
+    sections: {
+      reason: { bg: "#FFE6EC", accent: ACCENT.reason },
+      flow: { bg: "#E6F3FF", accent: ACCENT.flow },
+      expectation: { bg: "#E9F8E9", accent: ACCENT.expectation },
+      element: { bg: "#F0E6FF", accent: ACCENT.element },
+    },
     weeks: [
-      { tint: "#EEF2FB", accent: "#6E84C0" },
-      { tint: "#E9F4F7", accent: "#4FA0B0" },
-      { tint: "#F0EBFB", accent: "#8A7FD6" },
+      { tint: "#E6F3FF", accent: ACCENT.flow },
+      { tint: "#E9F8E9", accent: ACCENT.expectation },
+      { tint: "#F0E6FF", accent: ACCENT.element },
       { tint: "#EAF6FF", accent: "#4F9BE0" },
     ],
   },
   default: {
-    bg: "#FBF7F0", card: "#FFFFFF", ink: "#3F3833", sub: "#8A8078",
-    heroBg: "#F2D49B", heroAccent: "#9A6A2E", heroTitle: "#D97757",
-    badges: { reason: W("#D97757"), flow: W("#4F9BE0"), expectation: W("#5BC08A"), element: W("#4F9BE0") },
+    palette: { main: "#4AA8FF", point: "#FFB84D", sub1: "#6ED97A", sub2: "#BDA4FF", bg: "#FFF8EE" },
+    bg: "#FFF8EE", card: "#FFFFFF", ink: "#3F3833", sub: "#8A8078",
+    hero: { bg: "#4AA8FF", accent: "#1E63B0", title: "#FFFFFF" },
+    sections: {
+      reason: { bg: "#FFE6EC", accent: ACCENT.reason },
+      flow: { bg: "#E6F3FF", accent: ACCENT.flow },
+      expectation: { bg: "#E9F8E9", accent: ACCENT.expectation },
+      element: { bg: "#F0E6FF", accent: ACCENT.element },
+    },
     weeks: [
-      { tint: "#FDEDEF", accent: "#EE6F8A" },
-      { tint: "#E9F7EE", accent: "#3FB37A" },
-      { tint: "#F0EBFB", accent: "#8A6FD6" },
+      { tint: "#FFE6EC", accent: ACCENT.reason },
+      { tint: "#E9F8E9", accent: ACCENT.expectation },
+      { tint: "#F0E6FF", accent: ACCENT.element },
       { tint: "#FFF1E2", accent: "#F0913E" },
     ],
   },
@@ -109,7 +151,7 @@ export const STICKER_SIZE: Record<StickerTier, { min: number; max: number; defau
   decoration: { min: 300, max: 500, default: 360 },
 };
 
-/** tier 기준 크기 정규화 — 가로 기준 default 폭, aspect(h/w)로 높이 산출, min/max clamp */
+/** tier 기준 크기 정규화 — default 폭, aspect(h/w)로 높이, min/max clamp */
 export function stickerSize(tier: StickerTier, aspect = 1): { w: number; h: number } {
   const t = STICKER_SIZE[tier];
   const w = Math.round(Math.min(t.max, Math.max(t.min, t.default)));

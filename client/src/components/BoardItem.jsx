@@ -167,6 +167,9 @@ export default function BoardItem({
                   🧩
                 </button>
               )}
+              <button onClick={() => onConvert(item, "editTemplate")} title="편집 디자인 템플릿 (이 월안으로)">
+                🎨
+              </button>
             </>
           ) : (
             <>

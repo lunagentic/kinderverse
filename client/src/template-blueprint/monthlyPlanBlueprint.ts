@@ -37,7 +37,8 @@ import type {
 const CANVAS_W = 1080;
 const HERO_H = 560; // 상단 Hero 영역 높이 (확대: 420 → 560)
 const SECTION_SHIFT = HERO_H - 420; // 하단 섹션 이동량 (140)
-const CANVAS_H = 1920 + SECTION_SHIFT; // 캔버스도 그만큼 확대 (2060)
+// 하단 아이콘 풋터 제거로 콘텐츠 하단이 ≈1770까지 → base 1920→1800 축소 (여백 30)
+const CANVAS_H = 1800 + SECTION_SHIFT; // 1940
 
 // 레퍼런스 기본 콘텐츠 (payload 없을 때)
 const DEFAULT_CONTENT = {
@@ -101,12 +102,15 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
   const weekNumStyle: TextStyle = { fontSize: 30, weight: 800, color: "#FFFFFF", align: "center", fontFamily: TITLE_FONT };
   const bodyStyle: TextStyle = { fontSize: 26, weight: 500, color: T.ink, align: "left", fontFamily: BODY_FONT };
   const playStyle: TextStyle = { fontSize: 24, weight: 600, color: T.ink, align: "left", fontFamily: BODY_FONT };
-  const iconLabel: TextStyle = { fontSize: 22, weight: 700, color: T.ink, align: "center", fontFamily: BODY_FONT };
 
   // ── background (캔버스 배경 채움) ──
+  // 기본 하늘 그라데이션(Hero_sky)은 제외 — 풍경 장면 이미지(Hero_bg_image)만 유지
   const background: Layer = {
     id: "layer-background", type: "background", editable: true, movable: false, visible: true,
-    children: [shape("Background", "rect", { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H }, { fill: T.bg }, 0), ...hero.backgrounds],
+    children: [
+      shape("Background", "rect", { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H }, { fill: T.bg }, 0),
+      ...hero.backgrounds.filter((b) => b.id !== "Hero_sky"),
+    ],
   };
 
   // ── shape (카드 / 배지) ── Hero(Background + Title Area 배지) + 섹션 카드
@@ -153,8 +157,7 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     return weekSticker(`slot_week${i + 1}_${id}`, id, assetRoleOf(id), i);
   });
 
-  // ── sticker ── Hero Scene(Environment + Main Object) + 주차 + 아이콘(하단 풋터)
-  const ICONS = ["exploration", "observation", "expression", "cooperation", "play", "safety"];
+  // ── sticker ── Hero Scene(Environment + Main Object) + 주차
   const stickerSlots: AssetSlot[] = [
     ...hero.stickers,
     // 놀이 선정 이유 — 주제 연관 스티커 2개 (돋보기 소녀 좌 / 모래성 우)
@@ -164,10 +167,6 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     ...weekStickerSlots,
     // 교사의 기대 — 수첩 든 교사(반신) 좌측·칸 하단, 120% 확대 (190→228, 214→257)
     createAssetSlot({ id: "slot_expectation_teacher", type: "sticker", assetId: "summer_teacher_notepad", assetRole: "character", x: 70, y: 1513, width: 228, height: 257 }),
-    // 주요 놀이 요소 아이콘 — 하단 풋터로 이동 (작게, 한 줄)
-    ...ICONS.map((k, i) =>
-      createAssetSlot({ id: `slot_icon_${k}`, type: "sticker", assetId: `summer_icon_${k}`, assetRole: "icon", x: 70 + i * 158, y: 1800, width: 84, height: 84 })
-    ),
   ];
   const stickerLayer: Layer = { id: "layer-sticker", type: "sticker", editable: true, movable: true, visible: true, children: stickerSlots };
 
@@ -201,11 +200,6 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     texts.push(text(`Week${i + 1}Num`, `week_${i + 1}_num`, `${i + 1}주`, { x: p.x + 24, y: p.y + 34, width: 56, height: 32 }, weekNumStyle, 8));
     texts.push(text(`Week${i + 1}Title`, `week_${i + 1}_title`, w.title, { x: p.x + 92, y: p.y + 28, width: 340, height: 44 }, { fontSize: 36, weight: 700, color: wc.accent, align: "left", fontFamily: SUBTITLE_FONT }, 8, `weekly_flow[${i}].sub_theme`));
     texts.push(text(`Week${i + 1}Plays`, `week_${i + 1}_plays`, bullets(w.plays), { x: p.x + 28, y: p.y + 92, width: 404, height: 124 }, playStyle, 8, `weekly_flow[${i}].plays`));
-  });
-  // 아이콘 라벨 (풋터)
-  const ICON_LABEL: Record<string, string> = { exploration: "탐색", observation: "관찰", expression: "표현", cooperation: "협력", play: "놀이", safety: "안전" };
-  ICONS.forEach((k, i) => {
-    texts.push(text(`iconlbl_${k}`, `icon_${k}`, ICON_LABEL[k], { x: 56 + i * 158, y: 1888, width: 112, height: 28 }, iconLabel, 8));
   });
   const textLayer: Layer = { id: "layer-text", type: "text", editable: true, movable: true, visible: true, children: texts };
 

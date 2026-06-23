@@ -17,9 +17,16 @@ export function assetUrl(family: string, assetId: string): string {
   return `/generated-assets/${family}/${assetId}.png`;
 }
 
-/** 월안 입력 → 편집용 EditorDoc */
+// 편집 디자인 템플릿 출력 규격: A4 폭(210mm @96dpi)에 맞추고 높이는 콘텐츠 비율대로 가변.
+// 블루프린트는 1080폭 좌표로 저작되므로, 출력 시 A4_W/블루프린트폭 비율로 균일 축소한다.
+// (비율 유지 → 디자인 모양 불변, 규격만 A4 폭으로 정규화. MonthlyDocCard 의 A4_W=794 와 일치.)
+const A4_W = 794;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** 월안 입력 → 편집용 EditorDoc (A4 폭 정규화 · 높이 가변) */
 export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
   const { templateBlueprint } = buildDesign(input);
+  const S = A4_W / templateBlueprint.canvas.width; // A4 폭 맞춤 스케일
   const nodes: EditorNode[] = [];
   let z = 0;
 
@@ -30,7 +37,7 @@ export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
           id: child.id,
           kind: "image",
           layerType: layer.type,
-          x: child.x, y: child.y, w: child.width, h: child.height,
+          x: r2(child.x * S), y: r2(child.y * S), w: r2(child.width * S), h: r2(child.height * S),
           z: z++,
           assetId: child.assetId,
           assetFamily: child.assetFamily,
@@ -43,15 +50,15 @@ export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
           id: s.id,
           kind: "shape",
           layerType: layer.type,
-          x: s.frame.x, y: s.frame.y, w: s.frame.width, h: s.frame.height,
+          x: r2(s.frame.x * S), y: r2(s.frame.y * S), w: r2(s.frame.width * S), h: r2(s.frame.height * S),
           z: z++,
           locked: layer.type === "background", // 배경 채움은 잠금
           shape: s.shape,
           fill: s.style?.fill ?? "#FFFFFF",
-          radius: s.style?.radius ?? (s.shape === "pill" ? Math.round(s.frame.height / 2) : 0),
+          radius: r2((s.style?.radius ?? (s.shape === "pill" ? Math.round(s.frame.height / 2) : 0)) * S),
           opacity: s.style?.opacity ?? 1,
           stroke: s.style?.stroke,
-          strokeWidth: s.style?.strokeWidth,
+          strokeWidth: s.style?.strokeWidth != null ? r2(s.style.strokeWidth * S) : s.style?.strokeWidth,
           shadow: s.style?.shadow,
         });
         // (Hero 자체 배경 장면이 별도 존재 → 풀-캔버스 하늘 이미지는 중복이므로 추가하지 않음)
@@ -61,22 +68,23 @@ export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
           id: t.id,
           kind: "text",
           layerType: layer.type,
-          x: t.frame.x, y: t.frame.y, w: t.frame.width, h: t.frame.height,
+          x: r2(t.frame.x * S), y: r2(t.frame.y * S), w: r2(t.frame.width * S), h: r2(t.frame.height * S),
           z: z++,
           text: t.text,
-          fontSize: t.style?.fontSize ?? 32,
+          fontSize: r2((t.style?.fontSize ?? 32) * S),
           color: t.style?.color ?? "#3F3833",
           weight: t.style?.weight ?? 700,
           align: t.style?.align ?? "left",
           fontFamily: t.style?.fontFamily,
           stroke: t.style?.stroke,
-          strokeWidth: t.style?.strokeWidth,
+          strokeWidth: t.style?.strokeWidth != null ? r2(t.style.strokeWidth * S) : t.style?.strokeWidth,
         });
       }
     }
   }
 
-  return { canvas: { width: templateBlueprint.canvas.width, height: templateBlueprint.canvas.height }, nodes };
+  // 캔버스: 폭=A4(794px), 높이=콘텐츠 비율대로 가변(A4 1장보다 길면 여러 장에 걸침)
+  return { canvas: { width: A4_W, height: Math.round(templateBlueprint.canvas.height * S) }, nodes };
 }
 
 /**

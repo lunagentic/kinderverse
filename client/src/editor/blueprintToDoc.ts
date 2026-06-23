@@ -19,10 +19,7 @@ export function assetUrl(family: string, assetId: string): string {
 
 /** 월안 입력 → 편집용 EditorDoc */
 export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
-  const { designRecipe, templateBlueprint } = buildDesign(input);
-  const family = designRecipe.themeFamily;
-  const cw = templateBlueprint.canvas.width;
-  const ch = templateBlueprint.canvas.height;
+  const { templateBlueprint } = buildDesign(input);
   const nodes: EditorNode[] = [];
   let z = 0;
 
@@ -57,21 +54,7 @@ export function buildEditorDoc(input: DesignRecipeInput): EditorDoc {
           strokeWidth: s.style?.strokeWidth,
           shadow: s.style?.shadow,
         });
-        // 배경 레이어: 색 채움 위에 풀-캔버스 배경 이미지(summer_sky) 추가 (잠금, 누끼 제외)
-        if (layer.type === "background") {
-          nodes.push({
-            id: "Background-image",
-            kind: "image",
-            layerType: "background",
-            x: 0, y: 0, w: cw, h: ch,
-            z: z++,
-            locked: true,
-            assetId: `${family}_sky`,
-            assetFamily: family,
-            assetRole: "background",
-            imageUrl: assetUrl(family, `${family}_sky`),
-          });
-        }
+        // (Hero 자체 배경 장면이 별도 존재 → 풀-캔버스 하늘 이미지는 중복이므로 추가하지 않음)
       } else if ((child as TextElement).kind === "text") {
         const t = child as TextElement;
         nodes.push({

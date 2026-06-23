@@ -59,8 +59,9 @@ export interface HeroScene {
 
 /** 블루프린트 레이어(타입별) 버킷으로 평탄화 */
 export interface HeroLayerBuckets {
-  shapes: ShapeElement[]; // background(그라데이션) + titleArea 배지
-  stickers: AssetSlot[]; // 배경 이미지(뒤) → 캐릭터(앞)
+  backgrounds: (ShapeElement | AssetSlot)[]; // 하늘 그라데이션 + 배경 장면 이미지 (맨 뒤 = background 레이어)
+  shapes: ShapeElement[]; // titleArea 배지 (배경 위)
+  stickers: AssetSlot[]; // 캐릭터 (배경 위)
   decorations: AssetSlot[]; // decoratives
   texts: TextElement[]; // titleArea 텍스트
 }
@@ -157,8 +158,9 @@ export function heroSceneToBuckets(scene: HeroScene): HeroLayerBuckets {
   const titleShapes = scene.titleArea.filter((e): e is ShapeElement => (e as ShapeElement).kind === "shape");
   const titleTexts = scene.titleArea.filter((e): e is TextElement => (e as TextElement).kind === "text");
   return {
-    shapes: [...scene.background, ...titleShapes],
-    stickers: [...scene.backgroundImage, ...scene.characters],
+    backgrounds: [...scene.background, ...scene.backgroundImage], // 그라데이션 → 장면 이미지 (맨 뒤)
+    shapes: [...titleShapes], // 배지만 (배경 위)
+    stickers: [...scene.characters], // 캐릭터만 (배경 위)
     decorations: [...scene.decoratives],
     texts: [...titleTexts],
   };

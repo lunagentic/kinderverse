@@ -61,6 +61,7 @@ export function buildDesignRecipe(input: DesignRecipeInput): DesignRecipe {
   return {
     templateFamily,
     themeFamily,
+    themeText,
     styleFamily,
     layoutRecipe,
     content: fromPayload?.content,

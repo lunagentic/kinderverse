@@ -10,6 +10,7 @@
 //  - 제목 폰트 ONE Mobile POP(폴백), 본문 SUIT
 // =============================================================================
 import type { ThemeFamily } from "../design-recipe";
+import { deriveSeasonTheme, deriveTitleColors, inferSeed } from "./colorDerive";
 
 export const TITLE_FONT = "'ONE Mobile POP', 'Black Han Sans', 'Jua', sans-serif";
 // 소제목: 제목과 동일 계열(ONE Mobile POP) — Cafe24 이전 폰트
@@ -145,8 +146,27 @@ export const THEME_SYSTEM: Record<ThemeFamily, SeasonTheme> = {
   },
 };
 
-export function getTheme(family: ThemeFamily): SeasonTheme {
-  return THEME_SYSTEM[family] ?? THEME_SYSTEM.default;
+// 제목 2톤 컬러 — 계절 큐레이션(앞=계절명 / 뒤=이 왔어요). 미등록 주제는 themeText로 자동 도출.
+export const TITLE_COLORS: Record<ThemeFamily, [string, string]> = {
+  summer: ["#E8443B", "#2B7FE0"], // 여름=빨강 / 파랑
+  autumn: ["#F2722B", "#6B4423"], // 가을=주황 / 갈색
+  spring: ["#FF5C8A", "#3E9E5A"], // 봄=핑크 / 초록
+  winter: ["#2B7FE0", "#7A5BD0"], // 겨울=파랑 / 보라
+  default: ["#E8443B", "#2B7FE0"],
+};
+
+/** 테마 색상 — 계절은 큐레이션, 미등록 주제(default)는 themeText에서 자동 도출 */
+export function getTheme(family: ThemeFamily, themeText?: string): SeasonTheme {
+  if (family !== "default" && THEME_SYSTEM[family]) return THEME_SYSTEM[family];
+  if (themeText && themeText.trim()) return deriveSeasonTheme(inferSeed(themeText));
+  return THEME_SYSTEM.default;
+}
+
+/** 제목 2톤 컬러 — 계절은 큐레이션, 미등록 주제는 themeText에서 자동 도출 */
+export function getTitleColors(family: ThemeFamily, themeText?: string): [string, string] {
+  if (family !== "default") return TITLE_COLORS[family] ?? TITLE_COLORS.default;
+  if (themeText && themeText.trim()) return deriveTitleColors(inferSeed(themeText));
+  return TITLE_COLORS.default;
 }
 
 // ── Sticker Size System (크기 자동 정규화) ──

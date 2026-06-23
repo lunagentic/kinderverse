@@ -57,6 +57,8 @@ export interface MonthlyContent {
 export interface DesignRecipe {
   templateFamily: TemplateFamily;
   themeFamily: ThemeFamily;
+  /** 원본 주제 텍스트 — 미등록 주제의 컬러 자동 도출에 사용 */
+  themeText?: string;
   styleFamily: StyleFamily;
   layoutRecipe: LayoutRecipe;
   /** (Phase 5) 실제 데이터 콘텐츠 — 없으면 Blueprint 가 레퍼런스 기본값 사용 */

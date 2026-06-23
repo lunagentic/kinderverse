@@ -10,9 +10,11 @@
 // =============================================================================
 import type { DesignRecipe } from "../design-recipe";
 import { createAssetSlot } from "./assetSlot";
+import { selectSticker, WEEK_STICKER_POOL, assetRoleOf } from "../asset-family/selectAsset";
 import { buildHeroScene, heroSceneToBuckets } from "./heroScene";
 import {
   getTheme,
+  getTitleColors,
   stickerSize,
   TITLE_FONT,
   SUBTITLE_FONT,
@@ -72,7 +74,7 @@ function sticker(id: string, assetId: string, role: AssetSlot["assetRole"], tier
 const bullets = (items: string[]) => items.map((s) => `· ${s}`).join("\n");
 
 export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBlueprint {
-  const T = getTheme(recipe.themeFamily);
+  const T = getTheme(recipe.themeFamily, recipe.themeText);
   const C = { ...DEFAULT_CONTENT, ...(recipe.content ?? {}) };
   const S = T.sections;
   const pill = (fill: string): ShapeStyle => ({ fill, radius: 999 });
@@ -90,6 +92,7 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
       title: C.title,
       age: C.age,
       lifeTheme: C.theme,
+      titleColors: getTitleColors(recipe.themeFamily, recipe.themeText), // 주제 적응형 제목 2톤
     })
   );
 
@@ -103,7 +106,7 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
   // ── background (캔버스 배경 채움) ──
   const background: Layer = {
     id: "layer-background", type: "background", editable: true, movable: false, visible: true,
-    children: [shape("Background", "rect", { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H }, { fill: T.bg }, 0)],
+    children: [shape("Background", "rect", { x: 0, y: 0, width: CANVAS_W, height: CANVAS_H }, { fill: T.bg }, 0), ...hero.backgrounds],
   };
 
   // ── shape (카드 / 배지) ── Hero(Background + Title Area 배지) + 섹션 카드
@@ -142,6 +145,14 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     });
   };
 
+  // 주차 스티커를 월안 내용(소주제+놀이명)으로 선택 — 미매칭 시 기존 기본값 폴백
+  const DEFAULT_WEEK = ["summer_sun_sunglasses", "summer_frog", "summer_water_child", "summer_tent"];
+  const weekStickerSlots = weekPos.map((_, i) => {
+    const text = [C.weeks[i]?.title, ...(C.weeks[i]?.plays ?? [])].filter(Boolean).join(" ");
+    const id = selectSticker(text, { pool: WEEK_STICKER_POOL, weekTag: `week${i + 1}`, fallback: DEFAULT_WEEK[i] });
+    return weekSticker(`slot_week${i + 1}_${id}`, id, assetRoleOf(id), i);
+  });
+
   // ── sticker ── Hero Scene(Environment + Main Object) + 주차 + 아이콘(하단 풋터)
   const ICONS = ["exploration", "observation", "expression", "cooperation", "play", "safety"];
   const stickerSlots: AssetSlot[] = [
@@ -149,11 +160,8 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
     // 놀이 선정 이유 — 주제 연관 스티커 2개 (돋보기 소녀 좌 / 모래성 우)
     createAssetSlot({ id: "slot_reason_magnifier", type: "sticker", assetId: "summer_magnifier_girl", assetRole: "character", x: 56, y: 492, width: 190, height: 200 }),
     createAssetSlot({ id: "slot_reason_sandcastle", type: "sticker", assetId: "summer_sandcastle", assetRole: "object", x: 808, y: 512, width: 196, height: 168 }),
-    // 주차별 대표 스티커 (각 카드 우측, 80% 축소)
-    weekSticker("slot_week1_sun_sunglasses", "summer_sun_sunglasses", "object", 0),
-    weekSticker("slot_week2_frog", "summer_frog", "character", 1),
-    weekSticker("slot_week3_water_child", "summer_water_child", "character", 2),
-    weekSticker("slot_week4_tent", "summer_tent", "object", 3),
+    // 주차별 대표 스티커 (내용 기반 선택, 각 카드 우측, 80% 축소)
+    ...weekStickerSlots,
     // 교사의 기대 — 수첩 든 교사(반신) 좌측·칸 하단, 120% 확대 (190→228, 214→257)
     createAssetSlot({ id: "slot_expectation_teacher", type: "sticker", assetId: "summer_teacher_notepad", assetRole: "character", x: 70, y: 1513, width: 228, height: 257 }),
     // 주요 놀이 요소 아이콘 — 하단 풋터로 이동 (작게, 한 줄)
@@ -203,7 +211,7 @@ export function buildMonthlyPlanBlueprint(recipe: DesignRecipe): TemplateBluepri
 
   // Hero 확대분(SECTION_SHIFT)만큼 하단 섹션 전체를 아래로 이동 (Hero/캔버스 배경은 제외)
   const heroIds = new Set(
-    [...hero.shapes, ...hero.stickers, ...hero.decorations, ...hero.texts].map((e) => e.id)
+    [...hero.backgrounds, ...hero.shapes, ...hero.stickers, ...hero.decorations, ...hero.texts].map((e) => e.id)
   );
   heroIds.add("Background");
   const shiftChild = (c: ShapeElement | TextElement | AssetSlot): ShapeElement | TextElement | AssetSlot => {

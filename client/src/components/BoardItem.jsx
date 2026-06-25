@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { cutout as runCutout } from "../editor/cutout";
-import { X, FileText, Image as ImageIcon, Palette, LayoutGrid } from "lucide-react";
+import { X, FileText, Image as ImageIcon, Palette } from "lucide-react";
 import PlanView from "./PlanView.jsx";
 import Loader from "./Loader.jsx";
 import {
@@ -155,7 +155,7 @@ export default function BoardItem({
         </span>
       )}
 
-      {item.type === "plan" && onConvert && (
+      {item.type === "plan" && onConvert && item.data?.feature_id !== "play_idea" && (
         <div className="node-actions" onPointerDown={(e) => e.stopPropagation()}>
           {/* 놀이기록은 문서 버튼 숨김 */}
           {item.data?.feature_id !== "play_story" && (
@@ -165,33 +165,12 @@ export default function BoardItem({
           )}
           {item.type === "plan" && item.data?.feature_id === "monthly_plan" ? (
             <>
-              <button
-                onClick={() => onConvert(item, "image")}
-                title="이미지 v1 (인포그래픽 프롬프트 버전 1)"
-                style={{ display: "inline-flex", alignItems: "center", gap: 1 }}
-              >
+              <button onClick={() => onConvert(item, "image")} title="이미지">
                 <ImageIcon size={13} />
-                <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>1</span>
-              </button>
-              <button
-                onClick={() => onConvert(item, "imageV2")}
-                title="이미지 v2 (인포그래픽 프롬프트 버전 2)"
-                style={{ display: "inline-flex", alignItems: "center", gap: 1 }}
-              >
-                <ImageIcon size={13} />
-                <span style={{ fontSize: 9, fontWeight: 700, lineHeight: 1 }}>2</span>
               </button>
               <button onClick={() => onConvert(item, "kinderlab")} title="킨더랩">
                 <Palette size={13} />
               </button>
-              <button onClick={() => onConvert(item, "compareall")} title="한번에 보기">
-                <LayoutGrid size={13} />
-              </button>
-              {onMakeWeekCard && (
-                <button onClick={() => onMakeWeekCard(item)} title="이 월안으로 주차 카드 만들기">
-                  🧩
-                </button>
-              )}
               <button onClick={() => onConvert(item, "editTemplate")} title="편집 디자인 템플릿 (이 월안으로)">
                 🎨
               </button>
@@ -922,7 +901,7 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose, photos, deco
                 key={g.url}
                 className={"dpanel-thumb" + (el.src === g.url ? " on" : "")}
                 title={g.label}
-                onClick={() => onChange({ src: g.url })}
+                onClick={() => onChange({ src: g.url, cutout: true })}
               >
                 <img src={g.url} alt={g.label} draggable={false} />
               </button>

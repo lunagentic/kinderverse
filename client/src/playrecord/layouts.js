@@ -485,18 +485,17 @@ export function buildStoryDoc(payload) {
   // 헤더: 제목 + 놀이기록 배지 (아이콘 박스와 제목 박스가 겹치지 않게)
   els.push(m.emoji(M - 2, 44, 56, th.deco[1] || "🌍", -4));
   els.push(m.text(M + 96, 40, 458, 70, c.title, { fontSize: 52, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "center" }, { textRole: "title" }));
-  els.push(m.shape(M + 96, 112, 150, 34, { bg: th.badgeBg, radius: 8 }));
-  els.push(m.text(M + 96, 112, 150, 34, "놀이기록", { fontSize: 18, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }));
+  // 놀이기록 배지 — 상단 우측
+  els.push(m.shape(W - M - 150, 50, 150, 36, { bg: th.badgeBg, radius: 8 }));
+  els.push(m.text(W - M - 150, 50, 150, 36, "놀이기록", { fontSize: 18, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }));
 
-  // 정보 칩 4개
+  // 정보 칩 — 놀이기간 · 반이름 (좌측 2개)
   const chips = [
     ["🌱 놀이기간", has(c.month) ? c.month : (c.meta.period || "-")],
-    ["🌿 활동명", c.meta.theme || c.title],
     ["🌸 반이름", c.className || "-"],
-    ["⭐ 연령", c.meta.ageBand || "-"],
   ];
-  const chipColors = ["#E8F1FB", "#E9F4E7", "#FBEAF1", "#FCF3DA"]; // 소프트 블루·그린·핑크·옐로
-  const chipText = ["#3E72A8", "#4E8A52", "#B05A82", "#A9842A"];
+  const chipColors = ["#E8F1FB", "#FBEAF1"]; // 소프트 블루·핑크
+  const chipText = ["#3E72A8", "#B05A82"];
   const chipW = Math.floor((W - 2 * M - 3 * 12) / 4);
   chips.forEach(([label, value], i) => {
     const x = M + i * (chipW + 12);
@@ -512,9 +511,9 @@ export function buildStoryDoc(payload) {
   const quotes = c.activities.flatMap((a) => arr(a?.childQuotes)).filter(Boolean).slice(0, 2);
 
   // 번호 흐름 사진 12장 — 페이지 중앙에 정렬된 3열 그리드(정돈) + 곡선 점선 화살표
-  const fcols = 3, NPHOTO = 12, dBase = 116, cellW = 182;
+  const fcols = 3, NPHOTO = 12, dBase = 125, cellW = 182; // 사진 슬롯 120% 확대
   const gridW = fcols * cellW, fx = Math.round((W - gridW) / 2); // 가로 중앙 정렬
-  const startY = 350, rowH = 145;
+  const startY = 350, rowH = 151;
   const visCol = (i) => (Math.floor(i / fcols) % 2 === 1 ? fcols - 1 - (i % fcols) : i % fcols);
   const sActs = c.activities.length ? c.activities : [{ title: c.title, summary: "" }];
 
@@ -551,16 +550,29 @@ export function buildStoryDoc(payload) {
     els.push(m.text(x - 6, y - 6, 28, 28, String(i + 1), { fontSize: 15, fontFamily: HEAD_FONT, color: "#fff", align: "center", valign: "center" }));
   }
 
-  // 4) 유아 발화 말풍선 — 사진 아래 가장자리에 살짝 겹쳐 배치(최대 2개)
-  const qIdx = [0, 7].slice(0, quotes.length);
-  quotes.forEach((q, k) => {
-    const n = nodes[qIdx[k]];
-    if (!n) return;
-    const bw = 168, bh = 38;
-    const bx = Math.max(M, Math.min(Math.round(n.cx - bw / 2), W - M - bw));
-    const by = Math.round(n.cy + n.size / 2 - 10);
-    els.push(...speechBubble(m, bx, by, bw, q, th.badgeBg, bh));
-  });
+  // 4) 캡션: 활동 텍스트를 12장에 반복 없이 자연스럽게 분배(사진 1~2장당 1개, 그룹 중앙 아래)
+  //    — 레퍼런스처럼 모든 사진 영역에 설명 텍스트가 닿도록, 활동 수가 적으면 2장이 한 캡션을 공유
+  const caps = (c.activities.length ? c.activities.map((a) => a.summary || a.title || "") : [c.intro]).filter(Boolean);
+  if (caps.length) {
+    const groups = {};
+    for (let i = 0; i < NPHOTO; i++) {
+      const g = Math.floor((i * caps.length) / NPHOTO);
+      (groups[g] = groups[g] || []).push(i);
+    }
+    Object.keys(groups).forEach((g) => {
+      const idxs = groups[g], cap = caps[g];
+      if (!cap) return;
+      const cxs = idxs.map((i) => nodes[i].cx);
+      const minX = Math.min(...cxs), maxX = Math.max(...cxs);
+      const bottom = Math.max(...idxs.map((i) => nodes[i].cy + nodes[i].size / 2));
+      const wCap = Math.min(cellW * idxs.length - 8, maxX - minX + cellW - 16);
+      const hCap = rowH - dBase - 6; // 행 사이 여백에 맞춤
+      els.push(m.text(
+        Math.round((minX + maxX) / 2 - wCap / 2), Math.round(bottom + 3), Math.round(wCap), hCap,
+        cap, { fontSize: fitFontSize(cap, wCap, hCap, 11), fontFamily: BODY_FONT, color: "#5a5048", align: "center", valign: "top" }
+      ));
+    });
+  }
 
   // 하단 2패널
   const py = startY + (NPHOTO / fcols) * rowH + 8; // 4행 아래

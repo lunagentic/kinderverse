@@ -53,4 +53,10 @@ export const DECO_IMAGES: Array<{ url: string; label: string }> = [
   { url: "/assets/deco/ant.png", label: "개미" },
   { url: "/assets/deco/dragonfly.png", label: "잠자리" },
   { url: "/assets/deco/stagbeetle.png", label: "사슴벌레" },
+  // 환경지킴이 꾸미기 스티커 세트 (Pixar 느낌, gpt-image 생성)
+  { url: "/generated-assets/eco/01-earth.png", label: "지구" },
+  { url: "/generated-assets/eco/02-kid-plant.png", label: "화분 든 아이" },
+  { url: "/generated-assets/eco/03-recycle-bin.png", label: "재활용 쓰레기통" },
+  { url: "/generated-assets/eco/04-nature.png", label: "자연·꽃" },
+  { url: "/generated-assets/eco/05-lightbulb.png", label: "전구" },
 ];

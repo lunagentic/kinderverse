@@ -538,7 +538,7 @@ function Workspace() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format, title, content, variant: opts.variant }),
-        signal: AbortSignal.timeout(90000),
+        signal: AbortSignal.timeout(180000), // 카드형 이미지는 복잡해 ~70s+ 소요
       });
       if (!res.ok) return;
       const data = await res.json();

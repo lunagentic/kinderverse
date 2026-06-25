@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-25-story-actcolors";
+export const LAYOUT_VERSION = "2026-06-25-story-winterfixed";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -522,6 +522,23 @@ const STORY_STICKER_SPOTS = [
   { x: 498, y: 480, size: 26 },   // 사진7 모서리
   { x: 360, y: 632, size: 26 },   // 사진10 모서리
 ];
+// 겨울 스토리 기본 디자인 — 디자이너가 큐레이션한 스티커 에셋·좌표·크기·회전·반전 고정
+// (돋보기아이=제목 옆, 펭귄=우상단 반전, 다람쥐=하단, 눈송이 본·복제, 솔방울·곰 등 가장자리 마스코트)
+const STORY_WINTER_STICKERS = [
+  { src: "/generated-assets/stk-winter-1.png", x: 275, y: 79, w: 180, h: 180, rot: -6, flip: false }, // 돋보기 아이
+  { src: "/generated-assets/stk-winter-2.png", x: 637, y: 92, w: 156, h: 156, rot: 9, flip: true },   // 펭귄(우상단)
+  { src: "/generated-assets/stk-winter-3.png", x: 351, y: 1044, w: 128, h: 128, rot: -16, flip: true }, // 다람쥐(하단)
+  { src: "/generated-assets/stk-winter-4.png", x: 217, y: -23, w: 108, h: 108, rot: 6, flip: false },  // 눈송이(상단)
+  { src: "/generated-assets/stk-winter-4.png", x: 182, y: 604, w: 63, h: 63, rot: 6, flip: false },    // 눈송이(소)
+  { src: "/generated-assets/stk-winter-4.png", x: 415, y: 228, w: 63, h: 63, rot: 6, flip: false },
+  { src: "/generated-assets/stk-winter-4.png", x: 29, y: 135, w: 63, h: 63, rot: 6, flip: false },
+  { src: "/assets/deco/stk-winter-1.png", x: 668, y: 13, w: 126, h: 126, rot: -9, flip: false },  // 솔방울·열매(우상)
+  { src: "/assets/deco/stk-winter-2.png", x: -14, y: 17, w: 59, h: 59, rot: 12, flip: false },
+  { src: "/assets/deco/stk-winter-3.png", x: -34, y: 368, w: 125, h: 125, rot: -6, flip: false }, // 곰(좌 가장자리)
+  { src: "/assets/deco/stk-winter-4.png", x: 365, y: 798, w: 80, h: 80, rot: 9, flip: false },
+  { src: "/assets/deco/stk-winter-5.png", x: 553, y: 875, w: 126, h: 126, rot: -12, flip: false },
+  { src: "/assets/deco/stk-winter-8.png", x: 372, y: 338, w: 39, h: 39, rot: 12, flip: false },
+];
 
 export function buildStoryDoc(payload) {
   const c = read(payload);
@@ -534,11 +551,11 @@ export function buildStoryDoc(payload) {
   const half = Math.ceil(words.length / 2);
   const line1 = words.slice(0, half).join(" ");
   const line2 = words.length > 1 ? words.slice(half).join(" ") : "";
-  els.push(m.text(51, 44, 330, 90, line1, { fontSize: 101, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
-  if (line2) els.push(m.text(94, 106, 330, 90, line2, { fontSize: 101, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
+  els.push(m.text(51, 40, 360, 138, line1, { fontSize: 101, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
+  if (line2) els.push(m.text(94, 108, 360, 138, line2, { fontSize: 101, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
 
   // 인트로(좌상단)
-  if (has(c.intro)) els.push(m.text(37, 212, 331, 118, c.intro, { fontSize: fitFontSize(c.intro, 331, 118, 16), fontFamily: "'Gaegu', cursive", color: "#5b5246", align: "left", valign: "top" }));
+  if (has(c.intro)) els.push(m.text(37, 234, 331, 98, c.intro, { fontSize: fitFontSize(c.intro, 331, 98, 16), fontFamily: "'Gaegu', cursive", color: "#5b5246", align: "left", valign: "top" }));
 
   // 사진 슬롯 13 — 폴라로이드(흰 테두리+그림자), 번호·화살표 없음
   STORY_PHOTO_SLOTS.forEach((p, i) => {
@@ -578,7 +595,18 @@ export function buildStoryDoc(payload) {
   panel(1063, 81, th.supportBg, "#418bc8", c.support.title || "교사의 지원", c.support.text, 60);
 
   // 스티커 다수 — 기존 에셋 정책 유지(고정 스폿)
-  els.push(...placeFixedStickers(m, th, c.meta.theme || c.title, STORY_STICKER_SPOTS));
+  // 스티커: 겨울은 큐레이션된 고정 에셋(에셋·좌표·크기·회전·반전 그대로), 그 외 주제는 기존 자동 배치.
+  if (th.key === "winter") {
+    STORY_WINTER_STICKERS.forEach((s, i) => {
+      els.push({
+        id: `wstk${i}`, type: "image", src: s.src, fit: "contain", sticker: true,
+        x: s.x, y: s.y, w: s.w, h: s.h, rotation: s.rot, flipH: s.flip || undefined,
+        style: { radius: 0 },
+      });
+    });
+  } else {
+    els.push(...placeFixedStickers(m, th, c.meta.theme || c.title, STORY_STICKER_SPOTS));
+  }
   return doc(c.title, th.pageBg, els);
 }
 

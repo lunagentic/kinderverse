@@ -1104,10 +1104,25 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose, photos, deco
         </div>
       )}
 
-      {/* 회전 */}
+      {/* 회전 — 직접 각도 입력 + 버튼 + 슬라이더 */}
       <div className="dpanel-sec">
-        <div className="dpanel-label">
-          회전 <span style={{ color: "#9b8b7d", fontWeight: 400 }}>{Math.round(el.rotation || 0)}°</span>
+        <div className="dpanel-label">회전</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <input
+            type="number"
+            min="-360"
+            max="360"
+            step="1"
+            value={Math.round(el.rotation || 0)}
+            onPointerDown={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "" || v === "-") return; // 입력 중
+              onChange({ rotation: Math.max(-360, Math.min(360, Math.round(Number(v) || 0))) });
+            }}
+            style={{ width: 64, textAlign: "center", border: "1px solid var(--border,#ddd)", borderRadius: 7, padding: "5px 6px", fontSize: 12 }}
+          />
+          <span style={{ color: "#9b8b7d", fontSize: 12 }}>도(°)</span>
         </div>
         <div className="dpanel-btn-row">
           <button className="dpanel-size" title="왼쪽으로 15°" onClick={() => onChange({ rotation: Math.round((el.rotation || 0) - 15) })}>↺ -15°</button>
@@ -1255,6 +1270,32 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
   const draggedRef = useRef(false);
   const clickTimer = useRef(null);
 
+  // 회전 핸들 드래그 → 상자 중심 기준으로 기울임(피그마식). shift=15° 스냅.
+  const onRotateStart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const rnd = e.currentTarget.closest(".del");
+    if (!rnd) return;
+    const rect = rnd.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2; // 회전 중심(회전해도 불변)
+    const startA = Math.atan2(e.clientY - cy, e.clientX - cx);
+    const startRot = el.rotation || 0;
+    const move = (ev) => {
+      const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
+      let deg = startRot + (a - startA) * 180 / Math.PI;
+      deg = ((Math.round(deg) % 360) + 360) % 360;
+      if (deg > 180) deg -= 360;
+      if (ev.shiftKey) deg = Math.round(deg / 15) * 15;
+      onChange({ rotation: deg });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   const imgRadius = isImage ? (s.radius ?? 12) : 12;
   const imgBorder = s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined;
   let inner;
@@ -1343,6 +1384,21 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           {isImage && <button title="좌우반전" onClick={() => onChange({ flipH: !el.flipH })}><FlipHorizontal size={13} /></button>}
           <button title="회전 +15°" onClick={() => onChange({ rotation: Math.round((el.rotation || 0) + 15) })}><RotateCw size={13} /></button>
           {onDelete && <button title="삭제" className="del-fbar-x" onClick={onDelete}><X size={13} /></button>}
+        </div>
+      )}
+      {active && !editing && (
+        <div
+          className="del-rotate"
+          onPointerDown={onRotateStart}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="드래그하여 회전 (Shift=15° 단위)"
+          style={{
+            position: "absolute", left: "50%", top: "100%", marginTop: 10,
+            transform: `translateX(-50%) rotate(${-(el.rotation || 0)}deg) scale(${1 / (scale || 1)})`,
+            transformOrigin: "top center",
+          }}
+        >
+          <RotateCw size={12} />
         </div>
       )}
       <div

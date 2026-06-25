@@ -31,6 +31,9 @@ const ALWAYS_DECO: string[] = [
   "/generated-assets/deco-check-purple.png",
   "/generated-assets/deco-check-orange.png",
   "/generated-assets/deco-check-blue.png",
+  "/generated-assets/deco-gingham-1.png",
+  "/generated-assets/deco-gingham-2.png",
+  "/generated-assets/deco-gingham-3.png",
 ];
 const THEME_DECO_ASSETS: Record<string, string[]> = (() => {
   const out: Record<string, string[]> = { ...FALLBACK_DECO };

@@ -1620,3 +1620,12 @@ body,
 }
 .del-fbar button:hover { background: #f0ead9; }
 .del-fbar .del-fbar-x:hover { background: #fde2e2; color: #d9534f; }
+
+/* 회전 핸들 — 상자 아래 원형, 드래그로 기울임(피그마식) */
+.del-rotate {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 1px solid #c9bfa9; color: #6f6149;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22); cursor: grab; z-index: 40;
+}
+.del-rotate:active { cursor: grabbing; background: #f0ead9; }

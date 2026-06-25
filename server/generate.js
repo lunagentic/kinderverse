@@ -57,6 +57,7 @@ function detectFeature(prompt) {
   const p = prompt.toLowerCase();
   const has = (...kw) => kw.some((k) => p.includes(k.toLowerCase()));
 
+  if (has("놀이기록", "놀이 기록", "기록")) return "play_story";
   if (has("안내문", "가정통신문")) return "project_notice";
   if (has("미션", "놀이미션", "미션카드")) return "mission_card";
   if (has("프로젝트")) return "project_plan";
@@ -81,6 +82,8 @@ function titleOf(featureId, payload, ctx) {
 }
 
 const PLAN_SIZES = {
+  play_story: { w: 400, h: 480 }, // 내용 plan 카드(미리보기) — 🖼/🎨 버튼으로 결과물 생성
+
   play_idea: { w: 360, h: 360 },
   mission_card: { w: 320, h: 360 },
   monthly_plan: { w: 420, h: 460 },
@@ -91,6 +94,7 @@ const PLAN_SIZES = {
 };
 
 const REPLY = {
+  play_story: "놀이기록",
   play_idea: "놀이아이디어",
   mission_card: "놀이미션카드",
   monthly_plan: "월간 놀이계획(월안)",
@@ -100,7 +104,7 @@ const REPLY = {
   project_notice: "프로젝트 안내문",
 };
 
-async function generatePlan(featureId, prompt) {
+async function generatePlan(featureId, prompt, images = []) {
   const ctx = buildContext(prompt);
   const feature = PLAN_FEATURES[featureId];
   const { system, user } = buildPlanPrompt(featureId, ctx);
@@ -110,6 +114,11 @@ async function generatePlan(featureId, prompt) {
   const payload = llm || mockFromSchema(feature, ctx);
   const source = llm ? "llm" : "mock";
   const srcLabel = source === "llm" ? "AI" : "목업";
+
+  // 놀이기록: 업로드한 사진(최대 20장)을 카드에 그대로 배치 (AI 분석 없음)
+  if (featureId === "play_story" && Array.isArray(images) && images.length) {
+    payload.photos = images.slice(0, 20);
+  }
 
   // 놀이아이디어: 아이디어마다 개별 카드로 분리
   if (featureId === "play_idea" && Array.isArray(payload.ideas) && payload.ideas.length) {
@@ -132,6 +141,19 @@ async function generatePlan(featureId, prompt) {
   }
 
   const title = titleOf(featureId, payload, ctx);
+
+  // 놀이기록: 내용 plan 카드로 생성 → 카드의 🖼(이미지)·🎨(편집 디자인) 버튼으로 결과물 생성
+  if (featureId === "play_story") {
+    return {
+      items: [{
+        type: "plan",
+        data: { feature_id: featureId, output_type: feature.output_type, title, age_band: ctx.age_band, payload, source },
+        size: PLAN_SIZES.play_story,
+      }],
+      reply: `놀이기록 "${title}" 생성 완료 (${srcLabel}). 카드의 🎨(편집 디자인)·🖼(이미지) 버튼으로 만들어 보세요.`,
+    };
+  }
+
   const item = {
     type: "plan",
     data: { feature_id: featureId, output_type: feature.output_type, title, age_band: ctx.age_band, payload, source },
@@ -253,7 +275,14 @@ export async function generateInfographicPoster(plan, version = 1) {
   return { src: img.dataUrl, model: img.model, prompt, version: Number(version) === 2 ? 2 : 1 };
 }
 
-export async function convertItem({ format, title, content }) {
+// 놀이기록 이미지 유형별 레이아웃 스타일 (gpt-image 프롬프트용)
+const IMAGE_VARIANT_STYLE = {
+  card: "3열 × 4행으로 정확히 12개의 사진 카드를 배치 — 각 카드에 동그란 컬러 아이콘, 유아 활동 사진, 한두 줄 설명. 가지런하고 깔끔한 포스터.",
+  canvas: "12장의 살짝 기울어진 폴라로이드 사진을 자유롭게 흩어 배치한 스크랩북/콜라주, 귀여운 동물 마스코트 일러스트와 따뜻한 종이 질감 배경.",
+  story: "1번부터 12번까지 번호가 매겨진 정확히 12장의 사진이 곡선 점선 화살표로 이어지는 인포그래픽 흐름, 상단에 정보 칩(놀이기간·반이름·연령), 하단에 '놀이 속 배움'·'교사의 지원' 패널.",
+};
+
+export async function convertItem({ format, title, content, variant }) {
   const t = (title || "변환 결과").trim();
   const text = (content || "").trim();
 
@@ -265,18 +294,21 @@ export async function convertItem({ format, title, content }) {
   }
 
   if (format === "image") {
+    const variantStyle = IMAGE_VARIANT_STYLE[variant];
     const prompt = [
-      `한국 유아교육용 인포그래픽 포스터를 1장 디자인해줘.`,
+      `한국 유아교육용 '놀이기록' 인포그래픽 포스터를 1장 디자인해줘.`,
       `제목: "${t}".`,
       `내용(이 항목들을 섹션/카드로 배치):`,
       text.slice(0, 700),
+      variantStyle ? `레이아웃: ${variantStyle}` : "",
+      `중요: 유아들의 활동 사진(사진 프레임)을 반드시 12장 포함해 풍성하게 구성한다. 4~5장만 넣지 말 것.`,
       `스타일: 부드러운 수채화풍 일러스트, 파스텔·따뜻한 색감, 둥근 모서리 섹션 카드, 귀여운 유아·자연·놀이 일러스트, 깔끔한 한국어 제목과 짧은 설명 텍스트, 잡지 같은 정돈된 레이아웃. 세로형 포스터.`,
       `한국어 텍스트는 정확하고 읽기 쉽게.`,
-    ].join("\n");
+    ].filter(Boolean).join("\n");
     const img = await generateImage(prompt, { size: "1024x1536" });
     if (img) {
       return {
-        items: [{ type: "image", data: { src: img.dataUrl, alt: t, source: "openai", model: img.model }, size: { w: 320, h: 320 } }],
+        items: [{ type: "image", data: { src: img.dataUrl, alt: t, source: "openai", model: img.model }, size: { w: 360, h: 540 } }],
         reply: `"${t}" 이미지를 GPT(${img.model})로 만들었어요.`,
       };
     }
@@ -349,9 +381,9 @@ function buildDesignDoc(title, lines) {
   };
 }
 
-export async function generateItem(prompt) {
+export async function generateItem(prompt, images = []) {
   const featureId = detectFeature(prompt);
-  if (featureId) return generatePlan(featureId, prompt);
+  if (featureId) return generatePlan(featureId, prompt, images);
 
   const p = prompt.toLowerCase();
   if (/이미지|사진|그림|image|photo|일러스트/.test(p)) return await makeImage(prompt);

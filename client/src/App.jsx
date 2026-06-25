@@ -64,6 +64,19 @@ let idCounter = 1;
 // 카운터 + 랜덤 접미사 → HMR/리로드로 카운터가 리셋돼도 기존 아이템과 ID 충돌 방지
 const nextId = () => `item-${idCounter++}-${Math.random().toString(36).slice(2, 7)}`;
 
+// 기존 카드와 겹치지 않는 빈 위치 탐색 (시작점 → 우/하단으로 밀기)
+const rectsOverlap = (a, b) =>
+  a.x < b.x + b.w + 24 && a.x + a.w + 24 > b.x && a.y < b.y + b.h + 24 && a.y + a.h + 24 > b.y;
+function findFreeSpot(placed, w, h, x0, y0) {
+  let x = x0, y = y0, tries = 0;
+  while (placed.some((it) => rectsOverlap({ x, y, w, h }, it)) && tries < 600) {
+    x += 60;
+    if (x > x0 + 1400) { x = x0; y += 60; }
+    tries++;
+  }
+  return { x, y };
+}
+
 // 객체/배열 → 읽기 좋은 텍스트 (변환 입력용)
 const SKIP_KEYS = new Set([
   "output_type",
@@ -114,6 +127,19 @@ function cardToContent(item) {
   }
   if (item.type === "plan") {
     const p = d.payload || {};
+    // 놀이기록: 이미지(포스터) 생성용 깔끔한 텍스트 (제목·소개·놀이흐름·배움·지원)
+    if (d.feature_id === "play_story") {
+      const acts = (p.activities || [])
+        .map((a) => `- ${a.title || ""}${a.summary ? `: ${a.summary}` : ""}`.trim())
+        .filter((x) => x !== "-");
+      const content = [
+        p.introduction?.text,
+        acts.length ? `놀이 흐름:\n${acts.join("\n")}` : "",
+        p.learning?.text ? `놀이 속 배움: ${p.learning.text}` : "",
+        p.teacherSupport?.text ? `교사의 지원: ${p.teacherSupport.text}` : "",
+      ].filter(Boolean).join("\n");
+      return { title: d.title || p.header?.title || "놀이기록", content };
+    }
     // 놀이아이디어는 깔끔한 문장으로 추출
     if (Array.isArray(p.ideas) && p.ideas[0]) {
       const idea = p.ideas[0];
@@ -143,8 +169,30 @@ export default function App() {
   return <Workspace />;
 }
 
+// 보드 영속화 — items 를 localStorage 에 저장/복원 (새로고침·재방문 후에도 유지)
+const BOARD_KEY = "verse:board";
+function loadBoard() {
+  try {
+    const raw = localStorage.getItem(BOARD_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
 function Workspace() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(loadBoard);
+
+  // items 변경 시마다 자동 저장. 사진 dataURL 이 커서 용량 초과할 수 있으므로 실패는 경고만.
+  useEffect(() => {
+    try {
+      localStorage.setItem(BOARD_KEY, JSON.stringify(items));
+    } catch (e) {
+      console.warn("보드 저장 실패(브라우저 저장 용량 초과 가능):", e);
+    }
+  }, [items]);
   const [editorInput, setEditorInput] = useState(null); // 캔버스 디자인 에디터(Phase 4/5) 입력
   const [selectedIds, setSelectedIds] = useState([]); // 복수 선택
   const setSelectedId = (id) => setSelectedIds(id == null ? [] : [id]);
@@ -195,23 +243,11 @@ function Workspace() {
       if (!list.length) return;
       const { cx, cy } = viewCenter();
 
-      // 기존 카드와 겹치지 않는 위치 탐색 (중앙 기준 → 우/하단으로 밀기)
-      const overlaps = (a, b) =>
-        a.x < b.x + b.w + 24 && a.x + a.w + 24 > b.x && a.y < b.y + b.h + 24 && a.y + a.h + 24 > b.y;
-      const freeSpot = (placed, w, h, x0, y0) => {
-        let x = x0, y = y0, tries = 0;
-        while (placed.some((it) => overlaps({ x, y, w, h }, it)) && tries < 400) {
-          x += 60;
-          if (x > x0 + 1400) { x = x0; y += 60; }
-          tries++;
-        }
-        return { x, y };
-      };
       setItems((prev) => {
         const placed = [...prev];
         const created = list.map((g) => {
           const size = g.size ?? { w: 300, h: 220 };
-          const { x, y } = freeSpot(placed, size.w, size.h, cx - size.w / 2, cy - size.h / 2);
+          const { x, y } = findFreeSpot(placed, size.w, size.h, cx - size.w / 2, cy - size.h / 2);
           const it = { id: nextId(), type: g.type, data: g.data, x, y, w: size.w, h: size.h };
           placed.push(it);
           return it;
@@ -350,7 +386,7 @@ function Workspace() {
   }, [copySelected, pasteClipboard, duplicateSelected, removeSelected]);
 
   // 카드 → 문서/이미지/디자인 템플릿 변환 (원본 옆에 배치)
-  const convertCard = useCallback(async (item, format) => {
+  const convertCard = useCallback(async (item, format, opts = {}) => {
     // 월안 → 디자인 문서(클라이언트 렌더). 생성 즉시 선택 → 편집 가능.
     // 새 카드는 기존 카드들의 가장 오른쪽 끝 다음에 배치(겹치지 않게)
     const rightOf = (prev, W) => {
@@ -470,35 +506,81 @@ function Workspace() {
       addDesignDoc(combined, 960);
       return;
     }
+
+    // 놀이기록 "팔레트(편집 디자인)": 이미지 생성 없이 편집 캔버스(playrecord) 즉시 생성
+    if (format === "design" && item.data?.feature_id === "play_story") {
+      const d = item.data;
+      const W = 500, H = 707; // A4 비율 캔버스
+      const id = nextId();
+      setItems((prev) => {
+        const pos = rightOf(prev, W);
+        return [
+          ...prev,
+          {
+            id,
+            type: "playrecord",
+            data: {
+              feature_id: "play_story", output_type: d.output_type, title: d.title,
+              age_band: d.age_band, payload: d.payload, source: d.source,
+              variant: "card", page: 0, docs: {},
+            },
+            x: pos.x, y: pos.y, w: W, h: H,
+          },
+        ];
+      });
+      setSelectedId(id);
+      return;
+    }
+
     const { title, content } = cardToContent(item);
     try {
       const res = await fetch("/api/convert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format, title, content }),
+        body: JSON.stringify({ format, title, content, variant: opts.variant }),
         signal: AbortSignal.timeout(90000),
       });
       if (!res.ok) return;
       const data = await res.json();
       const list = data.items || [];
       setItems((prev) => {
-        const created = list.map((g, i) => {
+        const placed = [...prev];
+        const created = list.map((g) => {
           const size = g.size ?? { w: 300, h: 220 };
-          return {
-            id: nextId(),
-            type: g.type,
-            data: g.data,
-            x: item.x + item.w + 40 + i * (size.w + 20),
-            y: item.y,
-            w: size.w,
-            h: size.h,
-          };
+          const { x, y } = findFreeSpot(placed, size.w, size.h, item.x + item.w + 40, item.y);
+          const it = { id: nextId(), type: g.type, data: g.data, x, y, w: size.w, h: size.h };
+          placed.push(it);
+          return it;
         });
         return [...prev, ...created];
       });
     } catch {
       /* 변환 실패 시 무시 */
     }
+  }, []);
+
+  // 보드에 이미지 직접 추가 (버튼·드래그드롭) — point 는 보드 좌표
+  const addImagesAt = useCallback((srcs, point) => {
+    if (!srcs?.length) return;
+    const baseX = point?.x ?? 0, baseY = point?.y ?? 0;
+    srcs.forEach((src, i) => {
+      const place = (w, h) => {
+        const id = nextId();
+        setItems((prev) => {
+          const { x, y } = findFreeSpot(prev, w, h, Math.round(baseX - w / 2), Math.round(baseY - h / 2));
+          if (i === 0) setSelectedId(id);
+          return [...prev, { id, type: "image", data: { src, alt: "이미지", source: "upload" }, x, y, w, h }];
+        });
+      };
+      const img = new Image();
+      img.onload = () => {
+        const W = 280;
+        const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.75;
+        place(W, Math.max(80, Math.round(W * ratio)));
+      };
+      img.onerror = () => place(240, 200);
+      img.src = src;
+    });
   }, []);
 
   return (
@@ -519,6 +601,7 @@ function Workspace() {
         onConvert={convertCard}
         onEditCard={editCard}
         onMakeWeekCard={placeWeekCardsFrom}
+        onAddImages={addImagesAt}
       />
       <ChatPanel onGenerate={addGenerated} />
       {/* 주차 카드는 월안 카드의 🧩 버튼으로 생성합니다 (좌상단 런처 제거) */}

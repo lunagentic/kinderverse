@@ -39,8 +39,10 @@ app.post("/api/generate", async (req, res) => {
   if (!prompt) {
     return res.status(400).json({ error: "prompt 가 비어있습니다." });
   }
+  // 첨부 사진(dataURL 배열, 최대 20장) — 놀이기록 카드에 배치
+  const images = Array.isArray(req.body?.images) ? req.body.images.slice(0, 20) : [];
   try {
-    const item = await generateItem(prompt);
+    const item = await generateItem(prompt, images);
     res.json(item);
   } catch (err) {
     console.error("[verse] generate error:", err);
@@ -50,12 +52,12 @@ app.post("/api/generate", async (req, res) => {
 
 // 카드 → 문서/이미지/디자인 템플릿 변환
 app.post("/api/convert", async (req, res) => {
-  const { format, title, content } = req.body || {};
+  const { format, title, content, variant } = req.body || {};
   if (!["document", "image", "design"].includes(format)) {
     return res.status(400).json({ error: "format 은 document|image|design 중 하나여야 합니다." });
   }
   try {
-    const result = await convertItem({ format, title, content });
+    const result = await convertItem({ format, title, content, variant });
     res.json(result);
   } catch (err) {
     console.error("[verse] convert error:", err);
@@ -83,15 +85,16 @@ app.post("/api/weekcard-image", async (req, res) => {
   const prompt = (req.body?.prompt || "").trim();
   if (!prompt) return res.status(400).json({ error: "prompt 가 필요합니다." });
   const size = req.body?.size || "1024x1024";
+  const quality = req.body?.quality; // optional: low|medium|high|auto (스티커는 low)
   const reference = req.body?.reference; // optional dataURL
   try {
     let img = null;
     let usedReference = false;
     if (reference) {
-      img = await generateImageWithReference(prompt, reference, { size });
+      img = await generateImageWithReference(prompt, reference, { size, quality });
       usedReference = !!img;
     }
-    if (!img) img = await generateImage(prompt, { size }); // 레퍼런스 미사용/실패 시 폴백
+    if (!img) img = await generateImage(prompt, { size, quality }); // 레퍼런스 미사용/실패 시 폴백
     res.json({ src: img?.dataUrl || null, model: img?.model || null, usedReference });
   } catch (err) {
     console.error("[verse] weekcard-image error:", err);

@@ -110,7 +110,8 @@ export async function generateImage(prompt, opts = {}) {
   const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
   const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"; // 최신 (2026-04 출시)
   const size = opts.size || process.env.OPENAI_IMAGE_SIZE || "1024x1024";
-  const quality = process.env.OPENAI_IMAGE_QUALITY || "high"; // low|medium|high|auto
+  // 비용 절감: 기본 medium. 호출부(opts.quality) > 환경변수 > 기본(medium). 스티커는 호출부에서 low 지정.
+  const quality = opts.quality || process.env.OPENAI_IMAGE_QUALITY || "medium"; // low|medium|high|auto
   try {
     const res = await fetch(`${base}/images/generations`, {
       method: "POST",
@@ -146,6 +147,7 @@ export async function generateImageWithReference(prompt, referenceDataUrl, opts 
   // edits 지원 모델 (env 로 override 가능). 기본은 이미지 모델, 안되면 gpt-image-1.
   const model = process.env.OPENAI_IMAGE_EDIT_MODEL || process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
   const size = opts.size || process.env.OPENAI_IMAGE_SIZE || "1024x1024";
+  const quality = opts.quality || process.env.OPENAI_IMAGE_QUALITY || "medium"; // 비용 절감 기본 medium
   try {
     const b64 = referenceDataUrl.split(",")[1];
     if (!b64) return null;
@@ -154,6 +156,7 @@ export async function generateImageWithReference(prompt, referenceDataUrl, opts 
     form.append("model", model);
     form.append("prompt", prompt);
     form.append("size", size);
+    form.append("quality", quality);
     form.append("image", new Blob([buffer], { type: "image/png" }), "reference.png");
     const res = await fetch(`${base}/images/edits`, {
       method: "POST",

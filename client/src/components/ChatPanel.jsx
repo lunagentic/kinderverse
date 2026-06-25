@@ -9,9 +9,13 @@ import {
   FolderKanban,
   Target,
   Mail,
+  BookOpen,
+  ImagePlus,
+  X,
   AlertTriangle,
 } from "lucide-react";
 import Loader from "./Loader.jsx";
+import { filesToDataUrls, extractImageBlobs, MAX_PHOTOS } from "../utils/imageInput";
 
 // 유치원 월별 놀이주제 (누리과정 기반 대표 주제)
 const MONTHLY_PLAY_THEMES = {
@@ -38,6 +42,7 @@ const DOC_TYPES = [
   { label: "프로젝트 계획", Icon: FolderKanban, build: (m, t) => `'${t}' 프로젝트 계획 만들어줘` },
   { label: "놀이미션", Icon: Target, build: (m, t) => `${m}월 '${t}' 놀이미션 만들어줘` },
   { label: "프로젝트 안내문", Icon: Mail, build: (m, t) => `'${t}' 프로젝트 안내문 만들어줘` },
+  { label: "놀이기록", Icon: BookOpen, build: (m, t) => `${m}월 '${t}' 놀이기록 만들어줘` },
 ];
 
 function docSuggestions(month) {
@@ -177,12 +182,39 @@ function genericToText(v, depth = 0) {
   return `${pad}${v}`;
 }
 
+function playStoryToText(p) {
+  const S = [];
+  if (p.header?.title)
+    S.push(`■ ${p.header.title}${p.header.subtitle ? `\n${p.header.subtitle}` : ""}`);
+  if (p.introduction?.text) S.push(`■ 놀이 이야기\n${p.introduction.text}`);
+  const acts = arr(p.activities);
+  if (acts.length)
+    S.push(
+      "■ 놀이 흐름\n" +
+        acts
+          .map((a) => {
+            const head = `${a.order ? `${a.order}. ` : ""}${a.title || ""}`.trim();
+            const sum = a.summary ? `\n   ${a.summary}` : "";
+            const q = arr(a.childQuotes).length
+              ? "\n" + arr(a.childQuotes).map((x) => `   “${String(x).replace(/^["“”]|["“”]$/g, "")}”`).join("\n")
+              : "";
+            return head + sum + q;
+          })
+          .join("\n")
+    );
+  if (p.learning?.text) S.push(`■ ${p.learning.title || "놀이 속 배움"}\n${p.learning.text}`);
+  if (p.teacherSupport?.text)
+    S.push(`■ ${p.teacherSupport.title || "교사의 지원"}\n${p.teacherSupport.text}`);
+  return S.join("\n\n");
+}
+
 function planToText(item) {
   const d = item?.data;
   if (!d) return "";
   const p = d.payload || {};
   if (d.feature_id === "monthly_plan") return monthlyToText(p);
   if (d.feature_id === "play_idea") return playIdeaToText(p);
+  if (d.feature_id === "play_story") return playStoryToText(p);
   return genericToText(p);
 }
 
@@ -195,7 +227,38 @@ export default function ChatPanel({ onGenerate }) {
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState([]); // [{ id, src }] 최대 20장
+  const [dragOver, setDragOver] = useState(false);
   const listRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const photoSeq = useRef(0);
+
+  // 이미지 Blob 들을 다운스케일해서 photos 에 추가 (최대 20장)
+  const addBlobs = async (blobs) => {
+    if (!blobs.length) return;
+    const remaining = MAX_PHOTOS - photos.length;
+    if (remaining <= 0) return;
+    const urls = await filesToDataUrls(blobs, remaining);
+    if (urls.length)
+      setPhotos((prev) => [...prev, ...urls.map((src) => ({ id: ++photoSeq.current, src }))]);
+  };
+  const onPickFiles = (e) => {
+    addBlobs(extractImageBlobs(null, e.target.files));
+    e.target.value = ""; // 같은 파일 재선택 허용
+  };
+  const onPaste = (e) => {
+    const blobs = extractImageBlobs(e.clipboardData?.items, e.clipboardData?.files);
+    if (blobs.length) {
+      e.preventDefault();
+      addBlobs(blobs);
+    }
+  };
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    addBlobs(extractImageBlobs(e.dataTransfer?.items, e.dataTransfer?.files));
+  };
+  const removePhoto = (id) => setPhotos((prev) => prev.filter((p) => p.id !== id));
 
   const month = new Date().getMonth() + 1; // 1~12
   const theme = (MONTHLY_PLAY_THEMES[month] ?? [])[0] ?? "이달의 주제";
@@ -208,15 +271,20 @@ export default function ChatPanel({ onGenerate }) {
   const send = async (text) => {
     const prompt = (text ?? input).trim();
     if (!prompt || busy) return;
+    const images = photos.map((p) => p.src);
     setInput("");
-    setMessages((m) => [...m, { role: "user", text: prompt }]);
+    setPhotos([]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", text: prompt, photoCount: images.length },
+    ]);
     setBusy(true);
     const attempt = () =>
       fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-        signal: AbortSignal.timeout(90000), // 90초 타임아웃
+        body: JSON.stringify({ prompt, images }),
+        signal: AbortSignal.timeout(120000), // 사진 첨부 시 여유
       });
     try {
       // dev 서버 재시작 등 일시 오류 대비 1회 재시도
@@ -266,7 +334,14 @@ export default function ChatPanel({ onGenerate }) {
                 {m.error ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
               </span>
             )}
-            <span>{m.text}</span>
+            <span>
+              {m.text}
+              {m.photoCount > 0 && (
+                <span className="msg-photo-tag">
+                  <ImagePlus size={12} /> 사진 {m.photoCount}장
+                </span>
+              )}
+            </span>
           </div>
         ))}
         {busy && (
@@ -294,17 +369,60 @@ export default function ChatPanel({ onGenerate }) {
         ))}
       </div>
 
+      {photos.length > 0 && (
+        <div className="chat-photos">
+          {photos.map((p) => (
+            <div className="chat-photo" key={p.id}>
+              <img src={p.src} alt="첨부 사진" />
+              <button
+                type="button"
+                className="chat-photo-x"
+                onClick={() => removePhoto(p.id)}
+                title="삭제"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <span className="chat-photo-count">{photos.length}/{MAX_PHOTOS}</span>
+        </div>
+      )}
+
       <form
-        className="chat-input"
+        className={"chat-input" + (dragOver ? " is-drag" : "")}
         onSubmit={(e) => {
           e.preventDefault();
           send();
         }}
+        onPaste={onPaste}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={onPickFiles}
+        />
+        <button
+          type="button"
+          className="chat-attach"
+          disabled={busy || photos.length >= MAX_PHOTOS}
+          onClick={() => fileInputRef.current?.click()}
+          title={`사진 첨부 (최대 ${MAX_PHOTOS}장) · 붙여넣기·드래그도 가능`}
+        >
+          <ImagePlus size={18} />
+        </button>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="만들고 싶은 것을 입력하세요…"
+          placeholder={photos.length ? "사진 설명·요청을 입력하세요…" : "만들고 싶은 것을 입력하세요…"}
           disabled={busy}
         />
         <button type="submit" disabled={busy || !input.trim()}>

@@ -1,5 +1,7 @@
 // PROMPTS.md 출력 형식에 맞춰 plan payload 를 사람이 읽기 좋게 렌더링.
 // feature_id 별 전용 레이아웃. 알 수 없는 형태는 generic 으로 폴백.
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Dot,
   Target,
@@ -8,10 +10,49 @@ import {
   Home,
   AlertTriangle,
   Palette,
+  X,
 } from "lucide-react";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "" && !(Array.isArray(v) && v.length === 0);
+
+// 사진 확대 라이트박스 — 카드의 transform 영향을 안 받도록 body 로 portal 렌더.
+// 여러 장이면 ◀/▶ 로 넘기고, 배경/✕/Esc 로 닫는다.
+function Lightbox({ photos, index, onClose, onNav }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") onNav(1);
+      else if (e.key === "ArrowLeft") onNav(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, onNav]);
+  if (index == null || !photos?.[index]) return null;
+  const many = photos.length > 1;
+  return createPortal(
+    <div className="pv-lightbox" onClick={onClose} role="dialog" aria-modal="true">
+      <button className="pv-lb-x" onClick={onClose} aria-label="닫기"><X size={22} /></button>
+      {many && (
+        <button
+          className="pv-lb-nav pv-lb-prev"
+          onClick={(e) => { e.stopPropagation(); onNav(-1); }}
+          aria-label="이전"
+        >‹</button>
+      )}
+      <img src={photos[index]} alt="확대 사진" onClick={(e) => e.stopPropagation()} />
+      {many && (
+        <button
+          className="pv-lb-nav pv-lb-next"
+          onClick={(e) => { e.stopPropagation(); onNav(1); }}
+          aria-label="다음"
+        >›</button>
+      )}
+      {many && <div className="pv-lb-count">{index + 1} / {photos.length}</div>}
+    </div>,
+    document.body
+  );
+}
 
 function Section({ title, children }) {
   return (
@@ -410,6 +451,60 @@ function ProjectNoticeView({ d }) {
   );
 }
 
+// 놀이기록 (play_story / PlayRecordTemplate)
+function PlayStoryView({ d }) {
+  const photos = arr(d.photos);
+  const [zoom, setZoom] = useState(null); // 확대 중인 사진 인덱스
+  const navZoom = (delta) =>
+    setZoom((i) => (i == null ? i : (i + delta + photos.length) % photos.length));
+  return (
+    <div>
+      {d.header && has(d.header.subtitle) && <Para text={d.header.subtitle} />}
+      <Para label="놀이 이야기" text={d.introduction?.text} />
+      {arr(d.activities).length > 0 && (
+        <Section title="놀이 흐름">
+          {arr(d.activities).map((a, i) => (
+            <div className="pv-week" key={i}>
+              <div className="pv-week-head">
+                {has(a.order) && <span className="pv-week-no">{a.order}</span>}
+                {has(a.title) && <b className="pv-text">{a.title}</b>}
+                {has(a.photoSlots) && <span className="pv-tag pv-tag-soft">사진 {a.photoSlots}</span>}
+              </div>
+              {has(a.summary) && <div className="pv-sub">{a.summary}</div>}
+              {arr(a.childQuotes).length > 0 && (
+                <Bullets
+                  items={arr(a.childQuotes).map((q) => `“${String(q).replace(/^["“”]|["“”]$/g, "")}”`)}
+                  Icon={MessageCircle}
+                />
+              )}
+            </div>
+          ))}
+        </Section>
+      )}
+      {photos.length > 0 && (
+        <Section title={`사진 (${photos.length})`}>
+          <div className="pv-photos">
+            {photos.map((src, i) => (
+              <img
+                className="pv-photo"
+                key={i}
+                src={src}
+                alt={`놀이 사진 ${i + 1}`}
+                loading="lazy"
+                onClick={(e) => { e.stopPropagation(); setZoom(i); }}
+                title="클릭하면 크게 보기"
+              />
+            ))}
+          </div>
+        </Section>
+      )}
+      <Para label={d.learning?.title || "놀이 속 배움"} text={d.learning?.text} />
+      <Para label={d.teacherSupport?.title || "교사의 지원"} text={d.teacherSupport?.text} />
+      <Lightbox photos={photos} index={zoom} onClose={() => setZoom(null)} onNav={navZoom} />
+    </div>
+  );
+}
+
 // 공통 보조 섹션
 function OutdoorList({ items, keyName }) {
   const list = arr(items);
@@ -504,6 +599,7 @@ function Generic({ value, depth = 0 }) {
 }
 
 const RENDERERS = {
+  play_story: PlayStoryView,
   play_idea: PlayIdeaView,
   mission_card: MissionCardView,
   monthly_plan: MonthlyView,

@@ -116,7 +116,8 @@ export async function getAsset(d: AssetDescriptor, opts: { force?: boolean } = {
     const cached = getCachedAsset(d);
     if (cached) return { src: cached, cached: true };
   }
-  const gen = await generateImageForPrompt(buildAssetPrompt(d), { force: opts.force });
+  // 스티커/장식/아이콘 자산은 비용 절감 위해 low 품질로 생성
+  const gen = await generateImageForPrompt(buildAssetPrompt(d), { force: opts.force, quality: "low" });
   let cutout = gen.src;
   try {
     cutout = await removeBackground(gen.src, { tolerance: 46 }); // 흰 배경 → 투명
@@ -146,7 +147,8 @@ export async function getAssetSmart(
   } catch { /* ignore */ }
   if (!subject) subject = `a cute clay icon representing ${theme}`;
   const prompt = `${subject}, ${STYLE_SUFFIX}`;
-  const gen = await generateImageForPrompt(prompt, { reference: reference || null, force: opts.force });
+  // 스티커(클레이 아이콘) 자산은 비용 절감 위해 low 품질로 생성
+  const gen = await generateImageForPrompt(prompt, { reference: reference || null, force: opts.force, quality: "low" });
   let cutout = gen.src;
   try { cutout = await removeBackground(gen.src, { tolerance: 46 }); } catch { /* keep */ }
   setCachedAsset(d, cutout);

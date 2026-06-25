@@ -20,5 +20,6 @@ services:
         value: gpt-4o
       - key: OPENAI_IMAGE_MODEL
         value: gpt-image-2
+      # 비용 절감: 나머지 이미지 기본 medium (스티커는 코드에서 low 로 생성)
       - key: OPENAI_IMAGE_QUALITY
-        value: high
+        value: medium

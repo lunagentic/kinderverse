@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { cutout as runCutout } from "../editor/cutout";
 import { X, FileText, Image as ImageIcon, Palette, LayoutGrid } from "lucide-react";
@@ -18,6 +19,8 @@ import {
 import { DECO_IMAGES } from "../renderer/image/assetManifest";
 import WeekCardEditor from "./WeekCardEditor";
 import { buildPosterWeekCard } from "../templates/buildPosterWeekCard";
+import { VARIANTS, buildVariant, buildVariantPages, blankPage, makePhotoSlot, LAYOUT_VERSION } from "../playrecord/layouts";
+import { resolveSticker, payloadDecoAssets } from "../playrecord/stickerAssets";
 
 export default function BoardItem({
   item,
@@ -34,8 +37,22 @@ export default function BoardItem({
   onMakeWeekCard,
 }) {
   const [editing, setEditing] = useState(false);
+  const [imgMenu, setImgMenu] = useState(false); // 놀이기록 이미지 유형 선택 메뉴
   const drag = useRef(null);
   const resize = useRef(null);
+
+  // 놀이기록 plan 카드(팝업): 내용 높이에 맞춰 자동 고정(잘림 방지). 편집·저장으로 내용이 바뀌면 다시 맞춤.
+  const nodeRef = useRef(null);
+  const isStoryPlan = item.type === "plan" && item.data?.feature_id === "play_story";
+  useLayoutEffect(() => {
+    if (!isStoryPlan || item.manualResized) return; // 사용자가 직접 크기를 바꿨으면 자동 맞춤 중지
+    const el = nodeRef.current;
+    if (!el) return;
+    // .plan-body 가 내부 스크롤(overflow:auto)이므로 넘치는 양만큼 노드 높이를 키워 내용을 모두 노출.
+    const body = el.querySelector(".plan-body");
+    const extra = body ? body.scrollHeight - body.clientHeight : 0;
+    if (extra > 6) onUpdate(item.id, { h: Math.round(item.h + extra + 4) }); // extra≈0 되면 안정(루프 없음)
+  }, [isStoryPlan, item.h, item.data, item.manualResized, onUpdate, item.id]);
 
   // 아이템 드래그 이동 (Shift = 복수 선택 토글, 복수 선택 시 그룹 이동)
   const onPointerDown = (e) => {
@@ -66,7 +83,8 @@ export default function BoardItem({
       const ratio = resize.current.origH / resize.current.origW || 1;
       const delta = Math.max(dx, dy / ratio); // 가로/세로 드래그 모두 반영
       const newW = Math.max(200, Math.round(resize.current.origW + delta));
-      onUpdate(item.id, { w: newW, h: Math.round(newW * ratio) });
+      // 놀이기록 plan 카드: 사용자가 직접 크기를 바꾸면 자동 높이 맞춤이 덮어쓰지 않도록 플래그.
+      onUpdate(item.id, { w: newW, h: Math.round(newW * ratio), ...(isStoryPlan ? { manualResized: true } : {}) });
       return;
     }
     if (!drag.current) return;
@@ -104,6 +122,7 @@ export default function BoardItem({
 
   return (
     <div
+      ref={nodeRef}
       className={
         "node node-" + item.type + (selected ? " is-selected" : "")
       }
@@ -114,6 +133,8 @@ export default function BoardItem({
       onPointerCancel={endDrag}
       onDoubleClick={(e) => {
         e.stopPropagation();
+        // 놀이기록(plan)은 더블클릭 편집(메모/JSON 박스) 비활성화
+        if (item.type === "plan" && item.data?.feature_id === "play_story") return;
         setEditing(true);
       }}
     >
@@ -136,9 +157,12 @@ export default function BoardItem({
 
       {item.type === "plan" && onConvert && (
         <div className="node-actions" onPointerDown={(e) => e.stopPropagation()}>
-          <button onClick={() => onConvert(item, "document")} title="문서">
-            <FileText size={13} />
-          </button>
+          {/* 놀이기록은 문서 버튼 숨김 */}
+          {item.data?.feature_id !== "play_story" && (
+            <button onClick={() => onConvert(item, "document")} title="문서">
+              <FileText size={13} />
+            </button>
+          )}
           {item.type === "plan" && item.data?.feature_id === "monthly_plan" ? (
             <>
               <button
@@ -170,6 +194,30 @@ export default function BoardItem({
               )}
               <button onClick={() => onConvert(item, "editTemplate")} title="편집 디자인 템플릿 (이 월안으로)">
                 🎨
+              </button>
+            </>
+          ) : item.data?.feature_id === "play_story" ? (
+            <>
+              <span className="node-imgmenu-wrap">
+                <button onClick={() => setImgMenu((v) => !v)} title="이미지 (유형 선택)">
+                  <ImageIcon size={13} />
+                </button>
+                {imgMenu && (
+                  <div className="node-imgmenu" onPointerDown={(e) => e.stopPropagation()}>
+                    <div className="node-imgmenu-title">이미지로 만들 유형</div>
+                    {[["card", "카드형"], ["canvas", "캔버스형"], ["story", "스토리형"]].map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => { setImgMenu(false); onConvert(item, "image", { variant: v }); }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </span>
+              <button onClick={() => onConvert(item, "design")} title="편집 디자인 (캔버스)">
+                <Palette size={13} />
               </button>
             </>
           ) : (
@@ -248,6 +296,19 @@ function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, select
 
   if (type === "infographic") {
     return <InfographicCard item={item} data={data} selected={selected} zoom={zoom} onUpdateData={onUpdateData} />;
+  }
+
+  if (type === "playrecord") {
+    return (
+      <PlayRecordEditor
+        item={item}
+        data={data}
+        selected={selected}
+        zoom={zoom}
+        onUpdate={onUpdate}
+        onUpdateData={onUpdateData}
+      />
+    );
   }
 
   if (type === "plan") {
@@ -492,12 +553,13 @@ function InfographicCard({ item, data, selected, zoom, onUpdateData }) {
 }
 
 // ── DesignDoc: element 기반 디자인 (클릭 → 이동·리사이즈·텍스트 편집) ──
-export function DesignFrame({ data, selected, zoom = 1, onChange }) {
+export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAssets }) {
   const { frame, elements = [] } = data;
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(0.33);
   const [activeId, setActiveId] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState(null); // 사진 크게보기
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -548,8 +610,37 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
   const rndScale = scale * (zoom || 1);
   const activeEl = selected ? elements.find((e) => e.id === activeId && !e.locked) : null;
 
+  // 요소 복사/붙여넣기/복제 (편집 디자인 내부). 보드 단축키와 충돌 않게 stopPropagation.
+  const outerRef = useRef(null);
+  const elClip = useRef(null);
+  const pasteEl = () => {
+    const src = elClip.current;
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    copy.x = Math.round((copy.x || 0) + 18);
+    copy.y = Math.round((copy.y || 0) + 18);
+    elClip.current = JSON.parse(JSON.stringify(copy)); // 연속 붙여넣기 누적 오프셋
+    onChange?.({ elements: [...elements, copy] });
+    setActiveId(copy.id);
+  };
+  const onFrameKey = (e) => {
+    if (editId) return; // 텍스트 편집 중엔 무시
+    const mod = e.metaKey || e.ctrlKey;
+    const cur = elements.find((el) => el.id === activeId && !el.locked);
+    const k = e.key.toLowerCase();
+    if (mod && k === "c" && cur) { e.stopPropagation(); elClip.current = JSON.parse(JSON.stringify(cur)); }
+    else if (mod && k === "v" && elClip.current) { e.stopPropagation(); e.preventDefault(); pasteEl(); }
+    else if (mod && k === "d" && cur) { e.stopPropagation(); e.preventDefault(); elClip.current = JSON.parse(JSON.stringify(cur)); pasteEl(); }
+    else if ((e.key === "Delete" || e.key === "Backspace") && cur) { e.stopPropagation(); removeEl(cur.id); setActiveId(null); }
+  };
+  // 요소 선택 시 프레임에 포커스 → 단축키가 프레임에서 처리(보드 핸들러로 새지 않게)
+  useEffect(() => {
+    if (selected && activeId && !editId) outerRef.current?.focus({ preventScroll: true });
+  }, [activeId, editId, selected]);
+
   return (
-    <div className="dframe-outer">
+    <div className="dframe-outer" ref={outerRef} tabIndex={-1} onKeyDown={onFrameKey} style={{ outline: "none" }}>
       <div className="dframe-wrap" ref={wrapRef}>
         <div
           className="dframe"
@@ -572,6 +663,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
                 onCycle={() => cycleSelect(el.id)}
                 onEdit={() => setEditId(el.id)}
                 onEndEdit={() => setEditId(null)}
+                onEnlarge={(src) => src && setLightboxSrc(src)}
                 onChange={(p) => updateEl(el.id, p)}
               />
             ) : (
@@ -585,8 +677,11 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
       {activeEl && (
         <ControlPanel
           el={activeEl}
+          photos={photos}
+          decoAssets={decoAssets}
           onChange={(p) => updateEl(activeEl.id, p)}
           onReorder={(where) => reorder(activeEl.id, where)}
+          onEnlarge={(src) => src && setLightboxSrc(src)}
           onRemove={() => {
             removeEl(activeEl.id);
             setActiveId(null);
@@ -594,15 +689,42 @@ export function DesignFrame({ data, selected, zoom = 1, onChange }) {
           onClose={() => setActiveId(null)}
         />
       )}
+      <PhotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }
 
+// 사진 크게보기 라이트박스 (pv-lightbox 스타일 재사용)
+function PhotoLightbox({ src, onClose }) {
+  useEffect(() => {
+    if (!src) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [src, onClose]);
+  if (!src) return null;
+  return createPortal(
+    <div className="pv-lightbox" onClick={onClose} role="dialog" aria-modal="true">
+      <button className="pv-lb-x" onClick={onClose} aria-label="닫기"><X size={22} /></button>
+      <img src={src} alt="확대 사진" onClick={(e) => e.stopPropagation()} draggable={false} />
+    </div>,
+    document.body
+  );
+}
+
 // ── 우측 고정 컨트롤 패널 (선택된 요소 1개를 한 곳에서 편집) ──
-function ControlPanel({ el, onChange, onReorder, onRemove, onClose }) {
+function ControlPanel({ el, onChange, onReorder, onRemove, onClose, photos, decoAssets, onEnlarge }) {
   const s = el.style || {};
   const isText = el.type === "text";
   const isImage = el.type === "image" || el.type === "photo";
+  const onUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => onChange({ src: reader.result });
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
   const setStyle = (patch) => onChange({ style: { ...s, ...patch } });
   const baseFs = s._basefs ?? s.fontSize ?? 14;
   const setSize = (mult) => setStyle({ _basefs: baseFs, fontSize: Math.round(baseFs * mult) });
@@ -736,10 +858,64 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose }) {
         </>
       )}
 
-      {/* 이미지: 갤러리에서 클릭해 교체 */}
+      {/* 이미지/사진: 직접 업로드 · 첨부 사진 선택 · 비우기 · 꾸미기 그림 */}
       {isImage && (
         <div className="dpanel-sec">
-          <div className="dpanel-label">이미지 변경</div>
+          {el.src && (
+            <button
+              className="dpanel-upload"
+              style={{ marginBottom: 8, background: "#5B53A8", color: "#fff", borderColor: "#5B53A8" }}
+              title="사진 크게 보기 (더블클릭으로도 가능)"
+              onClick={() => onEnlarge?.(el.src)}
+            >
+              🔍 크게 보기
+            </button>
+          )}
+          <div className="dpanel-label">사진 넣기</div>
+          <label className="dpanel-upload" title="내 기기에서 사진 업로드">
+            <input type="file" accept="image/*" hidden onChange={onUpload} />
+            ⬆ 직접 업로드
+          </label>
+          {Array.isArray(photos) && photos.length > 0 && (
+            <>
+              <div className="dpanel-sublabel">첨부한 사진</div>
+              <div className="dpanel-gallery">
+                {photos.map((src, i) => (
+                  <button
+                    key={i}
+                    className={"dpanel-thumb" + (el.src === src ? " on" : "")}
+                    title={`사진 ${i + 1}`}
+                    onClick={() => onChange({ src })}
+                  >
+                    <img src={src} alt={`사진 ${i + 1}`} draggable={false} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {el.src && (
+            <button className="dpanel-size" style={{ marginTop: 6 }} onClick={() => onChange({ src: null })}>
+              사진 자리 비우기
+            </button>
+          )}
+          {Array.isArray(decoAssets) && decoAssets.length > 0 && (
+            <>
+              <div className="dpanel-sublabel">주제 그림</div>
+              <div className="dpanel-gallery">
+                {decoAssets.map((g) => (
+                  <button
+                    key={g.url}
+                    className={"dpanel-thumb" + (el.src === g.url ? " on" : "")}
+                    title={g.label}
+                    onClick={() => onChange({ src: g.url, cutout: false })}
+                  >
+                    <img src={g.url} alt={g.label} draggable={false} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="dpanel-sublabel">꾸미기 그림</div>
           <div className="dpanel-gallery">
             {DECO_IMAGES.map((g) => (
               <button
@@ -751,6 +927,71 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose }) {
                 <img src={g.url} alt={g.label} draggable={false} />
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 사진 프레임: 비율 가이드 + 테두리 두께 · 색 */}
+      {isImage && (
+        <div className="dpanel-sec">
+          <div className="dpanel-label">사진 비율 (가로:세로)</div>
+          <div className="dpanel-btn-row">
+            {[["4:3", 4 / 3], ["3:4", 3 / 4], ["1:1", 1], ["16:9", 16 / 9]].map(([lbl, r]) => (
+              <button
+                key={lbl}
+                className="dpanel-size"
+                title={`${lbl} 비율로 맞춤`}
+                onClick={() => onChange({ h: Math.max(40, Math.round(el.w / r)) })}
+              >
+                {lbl}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: "#9b8b7d", marginTop: 4 }}>크기 조절 시 비율이 유지돼요 (모서리 드래그)</div>
+
+          <div className="dpanel-label" style={{ marginTop: 10 }}>테두리 두께 <span style={{ color: "#9b8b7d", fontWeight: 400 }}>{s.strokeWidth || 0}px</span></div>
+          <input
+            type="range"
+            min="0"
+            max="40"
+            value={s.strokeWidth || 0}
+            onChange={(e) => setStyle({ stroke: s.stroke || "#ffffff", strokeWidth: Number(e.target.value) })}
+          />
+
+          <div className="dpanel-label" style={{ marginTop: 8 }}>테두리 색</div>
+          <div className="dpanel-eyedrop">
+            <input
+              type="color"
+              className="dpanel-color-input"
+              value={typeof s.stroke === "string" && /^#[0-9a-fA-F]{6}$/.test(s.stroke) ? s.stroke : "#ffffff"}
+              onInput={(e) => setStyle({ stroke: e.target.value, strokeWidth: s.strokeWidth || 12 })}
+              title="스포이드 / 직접 색 선택"
+            />
+            <span className="dpanel-eyedrop-label">스포이드 / 직접 선택</span>
+          </div>
+          {COLOR_GROUPS.filter((g) => g.name !== "그라데이션").map((g) => (
+            <div key={g.name} className="dpanel-grp">
+              <div className="dpanel-grp-name">{g.name}</div>
+              <div className="dpanel-sw-row">
+                {g.colors.map((c, i) => (
+                  <button
+                    key={i}
+                    className="del-sw"
+                    style={{ background: c }}
+                    title={c}
+                    onClick={() => setStyle({ stroke: c, strokeWidth: s.strokeWidth || 12 })}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="dpanel-grp">
+            <div className="dpanel-grp-name">기본</div>
+            <div className="dpanel-sw-row">
+              {["#ffffff", "#223160", "#000000", "#e07a5f", "#f2c14e", "#3fae6a", "#3b82d6"].map((c, i) => (
+                <button key={i} className="del-sw" style={{ background: c }} title={c} onClick={() => setStyle({ stroke: c, strokeWidth: s.strokeWidth || 12 })} />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -816,6 +1057,7 @@ const FONTS = [
   { name: "굵은둥근(Black Han Sans)", css: "'Black Han Sans', sans-serif" },
   { name: "본문(SUIT)", css: "'SUIT', sans-serif" },
   { name: "손글씨(Gaegu)", css: "'Gaegu', cursive" },
+  { name: "손글씨·또렷(나눔펜)", css: "'Nanum Pen Script', cursive" },
   { name: "굵은(Do Hyeon)", css: "'Do Hyeon', sans-serif" },
 ];
 
@@ -879,32 +1121,36 @@ function CutoutImg({ src, fit, style }) {
   );
 }
 
-function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onChange }) {
+function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onEnlarge, onChange }) {
   const s = el.style || {};
   const fill = { width: "100%", height: "100%", boxSizing: "border-box" };
   const isImage = el.type === "image" || el.type === "photo";
   const draggedRef = useRef(false);
   const clickTimer = useRef(null);
 
+  const imgRadius = isImage ? (s.radius ?? 12) : 12;
+  const imgBorder = s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined;
   let inner;
   if (el.type === "shape") {
     inner = <div style={{ ...fill, background: s.bg, borderRadius: s.radius || 0, border: s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined, boxShadow: s.shadow }} />;
   } else if (isImage) {
     inner = el.src ? (
       el.cutout ? (
-        <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...fill, borderRadius: 12 }} />
+        <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...fill, borderRadius: imgRadius }} />
       ) : (
         <img
           src={el.src}
           alt=""
           draggable={false}
-          style={{ ...fill, objectFit: el.fit || "contain", borderRadius: 12 }}
+          style={{ ...fill, boxSizing: "border-box", objectFit: el.fit || "contain", borderRadius: imgRadius, border: imgBorder }}
           onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
           onLoad={(e) => { e.currentTarget.style.visibility = "visible"; }}
         />
       )
     ) : (
-      <div className="dframe-imgph" style={fill}>{el.type === "photo" ? "사진 자리" : "이미지 자리"}</div>
+      <div className="dframe-imgph" style={{ ...fill, borderRadius: imgRadius, border: imgBorder }}>
+        <ImageIcon size={Math.max(18, Math.min(56, Math.round(Math.min(el.w, el.h) * 0.4)))} strokeWidth={1.6} />
+      </div>
     );
   } else if (el.type === "text") {
     inner = editing ? (
@@ -931,6 +1177,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       position={{ x: el.x, y: el.y }}
       scale={scale}
       bounds="parent"
+      lockAspectRatio={isImage}
       disableDragging={editing}
       enableResizing={active && !editing}
       onMouseDown={onSelect}
@@ -938,16 +1185,21 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       onDragStart={() => { draggedRef.current = false; }}
       onDrag={() => { draggedRef.current = true; }}
       onDragStop={(e, d) => onChange({ x: Math.round(d.x), y: Math.round(d.y) })}
-      onResizeStop={(e, dir, ref, delta, pos) =>
-        onChange({
-          w: Math.round(parseFloat(ref.style.width)),
-          h: Math.round(parseFloat(ref.style.height)),
-          x: Math.round(pos.x),
-          y: Math.round(pos.y),
-        })
-      }
+      onResizeStop={(e, dir, ref, delta, pos) => {
+        const nw = Math.round(parseFloat(ref.style.width));
+        const nh = Math.round(parseFloat(ref.style.height));
+        const patch = { w: nw, h: nh, x: Math.round(pos.x), y: Math.round(pos.y) };
+        // 이모지 스티커는 박스와 함께 글자 크기도 스케일(상자만 커지지 않게)
+        if (el.type === "text" && el.sticker && el.h) {
+          const ratio = nh / el.h;
+          const base = s.fontSize || 14;
+          patch.style = { ...s, fontSize: Math.max(8, Math.round(base * ratio)) };
+        }
+        onChange(patch);
+      }}
       className={"del" + (active ? " del-active" : "")}
-      style={{ zIndex: active ? 20 : 1 }}
+      // 도형은 선택해도 z-순서를 올리지 않음(z=1 유지) → 위에 놓인 사진·텍스트를 가리지 않고 함께 보며 편집(Canva 식)
+      style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1 }}
     >
       <div
         className="del-inner"
@@ -955,7 +1207,9 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           opacity: el.hidden ? 0.25 : s.opacity ?? 1,
           outline: el.hidden ? "1.5px dashed var(--accent)" : undefined,
           background: isImage ? s.bg : undefined,
-          borderRadius: 12,
+          borderRadius: isImage ? imgRadius : 12,
+          boxShadow: isImage ? s.shadow : undefined,
+          transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         }}
         onDoubleClick={
           el.type === "text"
@@ -963,9 +1217,11 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
                 clearTimeout(clickTimer.current); // 더블클릭은 순서변경 취소하고 편집
                 onEdit();
               }
-            : undefined
+            : isImage && el.src
+              ? () => { clearTimeout(clickTimer.current); onEnlarge?.(el.src); } // 사진 더블클릭 = 크게보기
+              : undefined
         }
-        /* 클릭 = 그 요소를 '선택만' (레이어 순서·순환 변경 없음). 순서 변경은 패널의 레이어 버튼으로만. */
+        /* 클릭 = 그 요소를 '선택만'. 사진 더블클릭 = 크게보기. */
       >
         {inner}
       </div>
@@ -981,8 +1237,27 @@ function DesignEl({ el }) {
     top: el.y,
     width: el.w,
     height: el.h,
+    transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
   };
   const s = el.style || {};
+
+  // 곡선 점선 화살표 커넥터 (스토리형 흐름) — 여러 색 세그먼트를 한 SVG로
+  if (el.type === "connector") {
+    return (
+      <svg
+        style={{ position: "absolute", left: el.x, top: el.y, overflow: "visible", pointerEvents: "none", opacity: s.opacity ?? 1 }}
+        width={el.w}
+        height={el.h}
+      >
+        {(el.segments || []).map((seg, i) => (
+          <g key={i}>
+            <path d={seg.d} fill="none" stroke={seg.color} strokeWidth={seg.sw || 3.5} strokeDasharray={seg.dash || "1.5 9"} strokeLinecap="round" />
+            {seg.head && <path d={seg.head} fill={seg.color} />}
+          </g>
+        ))}
+      </svg>
+    );
+  }
 
   if (el.type === "shape") {
     return <div style={{ ...base, boxSizing: "border-box", background: s.bg, borderRadius: s.radius || 0, opacity: s.opacity ?? 1, border: s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined, boxShadow: s.shadow }} />;
@@ -1002,24 +1277,26 @@ function DesignEl({ el }) {
     );
   }
   if (el.type === "image" || el.type === "photo") {
+    const radius = s.radius ?? 12;
+    const border = s.stroke && s.strokeWidth ? `${s.strokeWidth}px solid ${s.stroke}` : undefined;
     if (el.src) {
       if (el.cutout) {
-        return <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...base, borderRadius: 12, opacity: s.opacity ?? 1 }} />;
+        return <CutoutImg src={el.src} fit={el.fit || "contain"} style={{ ...base, borderRadius: radius, opacity: s.opacity ?? 1, boxShadow: s.shadow }} />;
       }
       return (
         <img
           src={el.src}
           alt=""
           draggable={false}
-          style={{ ...base, objectFit: el.fit || "cover", borderRadius: 12, opacity: s.opacity ?? 1 }}
+          style={{ ...base, boxSizing: "border-box", objectFit: el.fit || "cover", borderRadius: radius, border, boxShadow: s.shadow, opacity: s.opacity ?? 1 }}
           onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
           onLoad={(e) => { e.currentTarget.style.visibility = "visible"; }}
         />
       );
     }
     return (
-      <div className="dframe-imgph" style={{ ...base }}>
-        {el.type === "photo" ? "사진 자리" : "이미지 자리"}
+      <div className="dframe-imgph" style={{ ...base, boxSizing: "border-box", borderRadius: radius, border, boxShadow: s.shadow }}>
+        <ImageIcon size={Math.max(18, Math.min(56, Math.round(Math.min(el.w, el.h) * 0.4)))} strokeWidth={1.6} />
       </div>
     );
   }
@@ -1094,8 +1371,157 @@ function DesignCard({ item, data, editing, setEditing, onUpdateData, stop }) {
   );
 }
 
+// ── 놀이기록 편집기: 3유형 토글 + A4 페이지 + 자유 캔버스(DesignFrame) ──
+function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
+  const variant = data.variant || "card";
+  const docs = data.docs || {};
+  const pages = docs[variant];
+  const page = Math.min(data.page || 0, pages ? pages.length - 1 : 0);
+
+  // 활성 유형 문서가 없으면 빌드해 저장. 레이아웃 버전이 바뀌면 전체 재생성(최신 디자인 반영).
+  useEffect(() => {
+    if (data.docsVersion !== LAYOUT_VERSION) {
+      onUpdateData(item.id, {
+        docs: { [variant]: buildVariantPages(variant, data.payload) },
+        docsVersion: LAYOUT_VERSION,
+        page: 0,
+      });
+      return;
+    }
+    if (!docs[variant]) {
+      onUpdateData(item.id, {
+        docs: { ...docs, [variant]: buildVariantPages(variant, data.payload) },
+        page: 0,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
+
+  // 주제 스티커(이모지 폴백)를 기존 에셋 재사용 또는 생성으로 이미지 교체.
+  // dataRef 로 최신 docs 에 머지해 사용자 편집을 덮어쓰지 않는다. resolvingRef 로 중복 호출 방지.
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  const resolvingRef = useRef(new Set());
+  useEffect(() => {
+    if (!pages) return;
+    const pageEls = pages[page]?.elements || [];
+    const targets = pageEls.filter(
+      (e) => e.stickerAsset && !e.src && !resolvingRef.current.has(e.id)
+    );
+    if (!targets.length) return;
+    targets.forEach((e) => resolvingRef.current.add(e.id));
+    let cancelled = false;
+    (async () => {
+      const resolved = await Promise.all(
+        targets.map(async (el) => {
+          try {
+            return [el.id, await resolveSticker(el.stickerAsset)];
+          } catch {
+            return [el.id, null];
+          }
+        })
+      );
+      if (cancelled) return;
+      const map = new Map(resolved.filter(([, r]) => r && r.src));
+      if (!map.size) return;
+      const d = dataRef.current;
+      const curPages = d.docs?.[variant];
+      if (!curPages || !curPages[page]) return;
+      onUpdateData(item.id, {
+        docs: {
+          ...d.docs,
+          [variant]: curPages.map((pg, i) =>
+            i === page
+              ? {
+                  ...pg,
+                  elements: pg.elements.map((e) =>
+                    map.has(e.id)
+                      ? { ...e, type: "image", src: map.get(e.id).src, cutout: map.get(e.id).cutout, fit: "contain", text: undefined, style: { ...(e.style || {}), radius: 0 } }
+                      : e
+                  ),
+                }
+              : pg
+          ),
+        },
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant, page, pages]);
+
+  const setVariant = (v) => onUpdateData(item.id, { variant: v, page: 0 });
+  const updatePage = (patch) => {
+    if (!pages) return;
+    const next = pages.map((p, i) => (i === page ? { ...p, ...patch } : p));
+    onUpdateData(item.id, { docs: { ...docs, [variant]: next } });
+  };
+  const addPage = () => {
+    const next = [...(pages || []), blankPage(data.payload)];
+    onUpdateData(item.id, { docs: { ...docs, [variant]: next }, page: next.length - 1 });
+  };
+  const addPhotoSlot = () => {
+    if (!pages) return;
+    const slot = makePhotoSlot();
+    const next = pages.map((p, i) => (i === page ? { ...p, elements: [...p.elements, slot] } : p));
+    onUpdateData(item.id, { docs: { ...docs, [variant]: next } });
+  };
+  const removePage = () => {
+    if (!pages || pages.length <= 1) return;
+    onUpdateData(item.id, {
+      docs: { ...docs, [variant]: pages.filter((_, i) => i !== page) },
+      page: Math.max(0, page - 1),
+    });
+  };
+  const goPage = (delta) =>
+    pages && onUpdateData(item.id, { page: Math.max(0, Math.min(pages.length - 1, page + delta)) });
+
+  const stop = (e) => e.stopPropagation();
+  const activeDoc = pages && pages[page];
+
+  return (
+    <div className="prdoc">
+      {selected && (
+        <div className="prdoc-bar" onPointerDown={stop} onMouseDown={stop} onDoubleClick={stop}>
+          <div className="prdoc-tabs">
+            {VARIANTS.map((v) => (
+              <button
+                key={v.key}
+                className={"prdoc-tab" + (v.key === variant ? " on" : "")}
+                onClick={() => setVariant(v.key)}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <div className="prdoc-pages">
+            <button onClick={addPhotoSlot} title="사진 자리 추가" style={{ width: "auto", padding: "0 9px", fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>🖼 사진＋</button>
+            <span className="prdoc-bar-div" />
+            <button onClick={() => goPage(-1)} disabled={page <= 0} title="이전 페이지">‹</button>
+            <span className="prdoc-pageno">{page + 1} / {pages ? pages.length : 1}</span>
+            <button onClick={() => goPage(1)} disabled={!pages || page >= pages.length - 1} title="다음 페이지">›</button>
+            <button onClick={addPage} title="페이지 추가">＋</button>
+            {pages && pages.length > 1 && (
+              <button onClick={removePage} title="이 페이지 삭제">🗑</button>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="prdoc-canvas">
+        {activeDoc ? (
+          <DesignFrame data={activeDoc} selected={selected} zoom={zoom} onChange={updatePage} photos={data.payload?.photos} decoAssets={payloadDecoAssets(data.payload)} />
+        ) : (
+          <div className="prdoc-loading">불러오는 중…</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── KinderVerse 계획 카드 (구조화 JSON 렌더 + JSON 편집) ──
 const FEATURE_LABEL = {
+  play_story: "놀이기록",
   play_idea: "놀이아이디어",
   mission_card: "놀이미션카드",
   monthly_plan: "월간 놀이계획",
@@ -1107,6 +1533,7 @@ const FEATURE_LABEL = {
 
 // 유형별 배지 색상 (아이디어 vs 월안 등 한눈에 구분)
 const FEATURE_BADGE_COLOR = {
+  play_story: "#4a90b8", // 파랑(놀이기록)
   play_idea: "#2fa6a0", // 청록
   mission_card: "#e07a5f", // 코랄
   monthly_plan: "#d97757", // 주황(월안)
@@ -1213,20 +1640,23 @@ function TemplateCard({ item, data, selected, zoom, onUpdate, onUpdateData, stop
 }
 
 function PlanCard({ item, data, editing, setEditing, onUpdateData, stop }) {
+  const isStory = data.feature_id === "play_story";
   const [draft, setDraft] = useState("");
 
-  const startEdit = () => {
+  const startJsonEdit = () => {
     setDraft(JSON.stringify(data.payload, null, 2));
     setEditing(true);
   };
-
-  const commit = () => {
+  const commitJson = () => {
     try {
-      const payload = JSON.parse(draft);
-      onUpdateData(item.id, { payload });
+      onUpdateData(item.id, { payload: JSON.parse(draft) });
     } catch {
       /* JSON 오류 시 변경 취소 */
     }
+    setEditing(false);
+  };
+  const saveStory = (payload) => {
+    onUpdateData(item.id, { payload, title: payload?.header?.title || data.title });
     setEditing(false);
   };
 
@@ -1238,23 +1668,76 @@ function PlanCard({ item, data, editing, setEditing, onUpdateData, stop }) {
         </span>
         <span className="plan-age">{data.age_band}</span>
         {data.source === "mock" && <span className="plan-mock">목업</span>}
-        {/* JSON 편집 버튼 숨김 */}
+        {!editing && (
+          <button
+            className="plan-edit"
+            onPointerDown={stop}
+            onClick={(e) => { e.stopPropagation(); isStory ? setEditing(true) : startJsonEdit(); }}
+            title="내용 편집"
+          >
+            ✏️ 편집
+          </button>
+        )}
       </div>
       <div className="plan-title">{data.title}</div>
 
       {editing ? (
-        <div className="plan-editor" onPointerDown={stop}>
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
-          <div className="plan-editor-actions">
-            <button onClick={commit}>저장</button>
-            <button onClick={() => setEditing(false)}>취소</button>
+        isStory ? (
+          <StoryPlanEditor payload={data.payload} onSave={saveStory} onCancel={() => setEditing(false)} stop={stop} />
+        ) : (
+          <div className="plan-editor" onPointerDown={stop}>
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} />
+            <div className="plan-editor-actions">
+              <button onClick={commitJson}>저장</button>
+              <button onClick={() => setEditing(false)}>취소</button>
+            </div>
           </div>
-        </div>
+        )
       ) : (
         <div className="plan-body" onWheel={stop}>
           <PlanView featureId={data.feature_id} payload={data.payload} />
         </div>
       )}
+    </div>
+  );
+}
+
+// 놀이기록(play_story) plan 카드 구조화 편집기 — 제목·소개·활동·배움·지원을 폼으로 수정 후 저장.
+function StoryPlanEditor({ payload, onSave, onCancel, stop }) {
+  const [p, setP] = useState(() => JSON.parse(JSON.stringify(payload || {})));
+  const upd = (fn) => setP((prev) => { const n = JSON.parse(JSON.stringify(prev)); fn(n); return n; });
+  const acts = Array.isArray(p.activities) ? p.activities : [];
+  const lbl = { fontSize: 11, fontWeight: 700, color: "#6f6149", marginTop: 6 };
+  const inp = { width: "100%", boxSizing: "border-box", border: "1px solid var(--border, #ddd)", borderRadius: 7, padding: "5px 7px", fontSize: 12, fontFamily: "inherit" };
+  const ta = { ...inp, resize: "vertical", lineHeight: 1.5 };
+  const btn = { border: "1px solid var(--border, #ddd)", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", background: "#fff" };
+  return (
+    <div
+      className="plan-editor2"
+      onPointerDown={stop}
+      onWheel={stop}
+      onDoubleClick={stop}
+      style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", gap: 4, paddingRight: 2 }}
+    >
+      <div style={lbl}>제목</div>
+      <input style={inp} value={p.header?.title || ""} onChange={(e) => upd((n) => { n.header = n.header || {}; n.header.title = e.target.value; })} />
+      <div style={lbl}>놀이 이야기(소개)</div>
+      <textarea style={ta} rows={3} value={p.introduction?.text || ""} onChange={(e) => upd((n) => { n.introduction = n.introduction || {}; n.introduction.text = e.target.value; })} />
+      <div style={lbl}>활동</div>
+      {acts.map((a, i) => (
+        <div key={i} style={{ border: "1px solid #eee", borderRadius: 8, padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+          <input style={inp} placeholder={`활동 ${i + 1} 제목`} value={a.title || ""} onChange={(e) => upd((n) => { n.activities[i].title = e.target.value; })} />
+          <textarea style={ta} rows={2} placeholder="활동 내용" value={a.summary || ""} onChange={(e) => upd((n) => { n.activities[i].summary = e.target.value; })} />
+        </div>
+      ))}
+      <div style={lbl}>놀이 속 배움</div>
+      <textarea style={ta} rows={3} value={p.learning?.text || ""} onChange={(e) => upd((n) => { n.learning = n.learning || {}; n.learning.text = e.target.value; })} />
+      <div style={lbl}>교사의 지원</div>
+      <textarea style={ta} rows={3} value={p.teacherSupport?.text || ""} onChange={(e) => upd((n) => { n.teacherSupport = n.teacherSupport || {}; n.teacherSupport.text = e.target.value; })} />
+      <div style={{ display: "flex", gap: 6, marginTop: 8, position: "sticky", bottom: 0, background: "#fff", paddingTop: 4 }}>
+        <button style={{ ...btn, background: "#5B53A8", color: "#fff", border: "none", flex: 1 }} onClick={() => onSave(p)}>저장</button>
+        <button style={btn} onClick={onCancel}>취소</button>
+      </div>
     </div>
   );
 }

@@ -975,6 +975,25 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose, photos, deco
         </div>
       )}
 
+      {/* 회전 */}
+      <div className="dpanel-sec">
+        <div className="dpanel-label">
+          회전 <span style={{ color: "#9b8b7d", fontWeight: 400 }}>{Math.round(el.rotation || 0)}°</span>
+        </div>
+        <div className="dpanel-btn-row">
+          <button className="dpanel-size" title="왼쪽으로 15°" onClick={() => onChange({ rotation: Math.round((el.rotation || 0) - 15) })}>↺ -15°</button>
+          <button className="dpanel-size" title="오른쪽으로 15°" onClick={() => onChange({ rotation: Math.round((el.rotation || 0) + 15) })}>↻ +15°</button>
+          <button className="dpanel-size" title="회전 초기화" onClick={() => onChange({ rotation: 0 })}>초기화</button>
+        </div>
+        <input
+          type="range"
+          min="-180"
+          max="180"
+          value={Math.round(el.rotation || 0)}
+          onChange={(e) => onChange({ rotation: Number(e.target.value) })}
+        />
+      </div>
+
       {/* 레이어 순서 (z-order) */}
       {onReorder && (
         <div className="dpanel-sec">
@@ -1155,7 +1174,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       size={{ width: el.w, height: el.h }}
       position={{ x: el.x, y: el.y }}
       scale={scale}
-      bounds="parent"
+      bounds={el.sticker ? undefined : "parent"}
       lockAspectRatio={isImage}
       disableDragging={editing}
       enableResizing={active && !editing}

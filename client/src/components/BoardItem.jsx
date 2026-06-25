@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { cutout as runCutout } from "../editor/cutout";
-import { X, FileText, Image as ImageIcon, Palette, ImagePlus, Download, Copy, FlipHorizontal, RotateCw } from "lucide-react";
+import { X, FileText, Image as ImageIcon, Palette, ImagePlus, Download, Copy, FlipHorizontal, RotateCw, Bookmark, BookmarkCheck } from "lucide-react";
 import { toPng } from "html-to-image";
 import PlanView from "./PlanView.jsx";
 import Loader from "./Loader.jsx";
@@ -20,7 +20,7 @@ import {
 import { DECO_IMAGES } from "../renderer/image/assetManifest";
 import WeekCardEditor from "./WeekCardEditor";
 import { buildPosterWeekCard } from "../templates/buildPosterWeekCard";
-import { VARIANTS, buildVariant, buildVariantPages, blankPage, makePhotoSlot, LAYOUT_VERSION } from "../playrecord/layouts";
+import { VARIANTS, buildVariant, buildVariantPages, blankPage, makePhotoSlot, LAYOUT_VERSION, saveStoryStickers, themeKeyOf } from "../playrecord/layouts";
 import { resolveSticker, payloadDecoAssets } from "../playrecord/stickerAssets";
 
 export default function BoardItem({
@@ -1684,6 +1684,23 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData, onAddImage
     // 2) 보드에도 저장 — 렌더된 PNG를 카드 오른쪽에 이미지 아이템으로 추가
     onAddImages?.([dataUrl], { x: item.x + item.w + 180, y: item.y + 150 });
   };
+  // 현재 페이지 스티커 배치를 그 주제의 스토리 디폴트로 "찜" 저장
+  const [presetSaved, setPresetSaved] = useState(false);
+  const saveStickerPreset = () => {
+    if (!pages) return;
+    const els = pages[page]?.elements || [];
+    const stickers = els
+      .filter((e) => e.type === "image" && (e.sticker || /generated-assets|\/deco\//.test(e.src || "")))
+      .map((e) => ({
+        src: (e.src || "").replace(/^https?:\/\/[^/]+/, ""),
+        x: Math.round(e.x), y: Math.round(e.y), w: Math.round(e.w), h: Math.round(e.h),
+        rot: Math.round(e.rotation || 0), flip: !!e.flipH,
+      }));
+    if (!stickers.length) return;
+    saveStoryStickers(themeKeyOf(data.payload), stickers);
+    setPresetSaved(true);
+    setTimeout(() => setPresetSaved(false), 1600);
+  };
   const addPage = () => {
     const next = [...(pages || []), blankPage(data.payload)];
     onUpdateData(item.id, { docs: { ...docs, [variant]: next }, page: next.length - 1 });
@@ -1724,6 +1741,11 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData, onAddImage
           </div>
           <div className="prdoc-pages">
             <button onClick={saveImage} title="이미지로 저장 (PNG)" style={{ width: "auto", padding: "0 9px", display: "inline-flex", alignItems: "center" }}><Download size={15} /></button>
+            {variant === "story" && (
+              <button onClick={saveStickerPreset} title={presetSaved ? "스티커 배치 저장됨 ✓" : "현재 스티커 배치를 이 주제의 기본값으로 찜(저장)"} style={{ width: "auto", padding: "0 9px", display: "inline-flex", alignItems: "center", color: presetSaved ? "#3fae6a" : undefined }}>
+                {presetSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+              </button>
+            )}
             <button onClick={addPhotoSlot} title="사진 자리 추가" style={{ width: "auto", padding: "0 9px", display: "inline-flex", alignItems: "center" }}><ImagePlus size={16} /></button>
             <span className="prdoc-bar-div" />
             <button onClick={() => goPage(-1)} disabled={page <= 0} title="이전 페이지">‹</button>

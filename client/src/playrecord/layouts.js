@@ -598,20 +598,39 @@ export function buildStoryDoc(payload) {
   panel(972, 75, th.learnBg, "#f9973f", c.learning.title || "놀이 비법", c.learning.text, 54);
   panel(1063, 81, th.supportBg, "#418bc8", c.support.title || "교사의 지원", c.support.text, 60);
 
-  // 스티커 다수 — 기존 에셋 정책 유지(고정 스폿)
-  // 스티커: 겨울은 큐레이션된 고정 에셋(에셋·좌표·크기·회전·반전 그대로), 그 외 주제는 기존 자동 배치.
-  if (th.key === "winter") {
-    STORY_WINTER_STICKERS.forEach((s, i) => {
+  // 스티커: ① 사용자가 "찜"한 배치(localStorage) ② 겨울 큐레이션 디폴트 ③ 그 외 주제 자동 배치
+  const fixed = savedStoryStickers(th.key) || (th.key === "winter" ? STORY_WINTER_STICKERS : null);
+  if (fixed) {
+    fixed.forEach((s, i) => {
       els.push({
         id: `wstk${i}`, type: "image", src: s.src, fit: "contain", sticker: true,
-        x: s.x, y: s.y, w: s.w, h: s.h, rotation: s.rot, flipH: s.flip || undefined,
-        style: { radius: 0 },
+        x: s.x, y: s.y, w: s.w, h: s.h, rotation: s.rot ?? s.rotation ?? 0,
+        flipH: (s.flip ?? s.flipH) || undefined, style: { radius: 0 },
       });
     });
   } else {
     els.push(...placeFixedStickers(m, th, c.meta.theme || c.title, STORY_STICKER_SPOTS));
   }
   return doc(c.title, th.pageBg, els);
+}
+
+// ── 스토리 스티커 "찜" 프리셋 (테마별 localStorage) ──
+const STORY_STK_KEY = (themeKey) => `pr-story-stickers-${themeKey || "default"}`;
+function savedStoryStickers(themeKey) {
+  try {
+    const raw = typeof localStorage !== "undefined" && localStorage.getItem(STORY_STK_KEY(themeKey));
+    if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr; }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+// 현재 스티커 배치를 그 주제의 스토리 디폴트로 저장(찜)
+export function saveStoryStickers(themeKey, stickers) {
+  try { localStorage.setItem(STORY_STK_KEY(themeKey), JSON.stringify(stickers)); return true; } catch (e) { return false; }
+}
+// payload → 주제 키 (찜 저장/조회용)
+export function themeKeyOf(payload) {
+  const text = `${payload?.meta?.theme || ""} ${payload?.header?.title || ""}`;
+  return (themeFor(text) || {}).key || "default";
 }
 
 // 사진 자리(빈 photo 요소) 1개 — 추가 시마다 조금씩 어긋나게 배치

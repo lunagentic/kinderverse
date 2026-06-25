@@ -14,12 +14,29 @@ const FALLBACK_DECO: Record<string, string[]> = {
   summer: ["/assets/deco/sun.png", "/assets/deco/beach.png", "/assets/deco/fruit.png"],
   eco: ["/assets/deco/tree.png", "/assets/deco/flower.png", "/assets/deco/lavender.png"],
   spring: ["/assets/deco/flower.png", "/assets/deco/lavender.png"],
+  // 겨울 주제 Pixar 스티커 (gpt-image-1, 투명 PNG) — 돋보기 아이·펭귄·다람쥐·눈송이
+  winter: [
+    "/generated-assets/stk-winter-1.png",
+    "/generated-assets/stk-winter-2.png",
+    "/generated-assets/stk-winter-3.png",
+    "/generated-assets/stk-winter-4.png",
+  ],
   default: ["/assets/deco/rainbow.png", "/assets/deco/cloud.png", "/assets/deco/sun.png"],
 };
+// 주제와 무관하게 "꾸미기 그림"에 항상 노출되는 꾸밈 스티커 — 테이프/압정핀(스크랩북 느낌)
+const ALWAYS_DECO: string[] = [
+  "/generated-assets/deco-tape-1.png",
+  "/generated-assets/deco-tape-2.png",
+  "/generated-assets/deco-pin-1.png",
+];
 const THEME_DECO_ASSETS: Record<string, string[]> = (() => {
   const out: Record<string, string[]> = { ...FALLBACK_DECO };
   for (const [k, urls] of Object.entries(STICKER_MANIFEST)) {
     out[k] = [...(urls as string[]), ...(out[k] || [])];
+  }
+  // 겨울: 새 Pixar 스티커(돋보기 아이·펭귄·다람쥐·눈송이)를 앞에 둬 자동배치(idx 0~)에 우선 노출 → 레퍼런스 밸런스
+  if (FALLBACK_DECO.winter) {
+    out.winter = [...FALLBACK_DECO.winter, ...((STICKER_MANIFEST as any).winter || [])];
   }
   return out;
 })();
@@ -42,9 +59,13 @@ function loadable(url: string): Promise<boolean> {
   if (!p) {
     p = new Promise<boolean>((res) => {
       const img = new Image();
-      img.onload = () => res(img.naturalWidth > 0);
-      img.onerror = () => res(false);
+      let done = false;
+      const settle = (v: boolean) => { if (!done) { done = true; res(v); } };
+      img.onload = () => settle(img.naturalWidth > 0);
+      img.onerror = () => settle(false);
       img.src = url;
+      // 안전장치: 대용량 이미지 동시 로드가 stall 돼도 Promise.all 이 멈추지 않게 타임아웃
+      setTimeout(() => settle(false), 12000);
     });
     loadCache.set(url, p);
   }
@@ -74,5 +95,8 @@ export function payloadDecoAssets(payload: any): Array<{ url: string; label: str
   const text = `${payload?.meta?.theme || ""} ${payload?.header?.title || ""}`;
   const key = (themeFor(text) as any)?.key || "default";
   const urls = THEME_DECO_ASSETS[key] || THEME_DECO_ASSETS.default || [];
-  return urls.map((url, i) => ({ url, label: `${key}-${i + 1}` }));
+  const themeList = urls.map((url, i) => ({ url, label: `${key}-${i + 1}` }));
+  // 테이프/압정핀 꾸밈 스티커는 항상 노출
+  const always = ALWAYS_DECO.map((url, i) => ({ url, label: `deco-${i + 1}` }));
+  return [...themeList, ...always];
 }

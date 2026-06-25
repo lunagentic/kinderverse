@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { cutout as runCutout } from "../editor/cutout";
-import { X, FileText, Image as ImageIcon, Palette } from "lucide-react";
+import { X, FileText, Image as ImageIcon, Palette, ImagePlus, Download } from "lucide-react";
+import { toPng } from "html-to-image";
 import PlanView from "./PlanView.jsx";
 import Loader from "./Loader.jsx";
 import {
@@ -548,6 +549,8 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
   const [activeId, setActiveId] = useState(null);
   const [editId, setEditId] = useState(null);
   const [lightboxSrc, setLightboxSrc] = useState(null); // 사진 크게보기
+  const [selIds, setSelIds] = useState([]); // 복수 선택(shift/cmd 클릭)
+  const histRef = useRef([]); // 실행취소 스택(요소 배열 스냅샷, 무제한)
 
   useLayoutEffect(() => {
     const el = wrapRef.current;
@@ -559,9 +562,42 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
     return () => ro.disconnect();
   }, [frame.w]);
 
+  // 모든 요소 변경의 단일 통로 — 변경 직전 스냅샷을 실행취소 스택에 push(무제한)
+  const commit = (nextElements) => {
+    histRef.current.push(elements);
+    onChange?.({ elements: nextElements });
+  };
+  const undo = () => {
+    if (!histRef.current.length) return;
+    onChange?.({ elements: histRef.current.pop() });
+  };
   const updateEl = (id, patch) =>
-    onChange?.({ elements: elements.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
-  const removeEl = (id) => onChange?.({ elements: elements.filter((e) => e.id !== id) });
+    commit(elements.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  const removeEl = (id) => commit(elements.filter((e) => e.id !== id));
+  const removeMany = (ids) => commit(elements.filter((e) => !ids.includes(e.id)));
+  // 요소 이동 — 복수 선택 시 선택된 요소들을 같은 델타로 함께 이동
+  const moveEl = (id, x, y) => {
+    const el = elements.find((e) => e.id === id);
+    if (!el) return;
+    if (selIds.length > 1 && selIds.includes(id)) {
+      const dx = Math.round(x) - el.x, dy = Math.round(y) - el.y;
+      commit(elements.map((e) => (selIds.includes(e.id) && !e.locked ? { ...e, x: e.x + dx, y: e.y + dy } : e)));
+    } else {
+      commit(elements.map((e) => (e.id === id ? { ...e, x: Math.round(x), y: Math.round(y) } : e)));
+    }
+  };
+  // 선택 — shift/cmd/ctrl 시 복수 토글, 아니면 단일
+  const selectEl = (id, e) => {
+    if (e && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+      setSelIds((prev) => {
+        const base = prev.length ? prev : (activeId ? [activeId] : []);
+        return base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+      });
+    } else {
+      setSelIds([id]);
+    }
+    setActiveId(id);
+  };
 
   // 두 사각형이 겹치는지
   const overlaps = (a, b) =>
@@ -576,7 +612,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
     if (stack.length <= 1) return; // 겹친 게 없으면 선택 유지
     const idx = stack.findIndex((e) => e.id === id);
     const next = stack[(idx - 1 + stack.length) % stack.length]; // 시각적으로 바로 아래로 순환
-    setActiveId(next.id);
+    setActiveId(next.id); setSelIds([next.id]);
   };
 
   // 명시적 z-순서 변경 (잠금 배경은 항상 최하단 유지)
@@ -592,7 +628,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
     else if (where === "back") at = lo;
     else if (where === "forward") at = Math.min(rest.length, curIdx + 1);
     else at = Math.max(lo, curIdx - 1); // backward
-    onChange?.({ elements: [...rest.slice(0, at), cur, ...rest.slice(at)] });
+    commit([...rest.slice(0, at), cur, ...rest.slice(at)]);
   };
 
   const rndScale = scale * (zoom || 1);
@@ -609,18 +645,23 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
     copy.x = Math.round((copy.x || 0) + 18);
     copy.y = Math.round((copy.y || 0) + 18);
     elClip.current = JSON.parse(JSON.stringify(copy)); // 연속 붙여넣기 누적 오프셋
-    onChange?.({ elements: [...elements, copy] });
-    setActiveId(copy.id);
+    commit([...elements, copy]);
+    setActiveId(copy.id); setSelIds([copy.id]);
   };
   const onFrameKey = (e) => {
     if (editId) return; // 텍스트 편집 중엔 무시
     const mod = e.metaKey || e.ctrlKey;
     const cur = elements.find((el) => el.id === activeId && !el.locked);
     const k = e.key.toLowerCase();
-    if (mod && k === "c" && cur) { e.stopPropagation(); elClip.current = JSON.parse(JSON.stringify(cur)); }
+    if (mod && k === "z" && !e.shiftKey) { e.stopPropagation(); e.preventDefault(); undo(); }
+    else if (mod && k === "c" && cur) { e.stopPropagation(); elClip.current = JSON.parse(JSON.stringify(cur)); }
     else if (mod && k === "v" && elClip.current) { e.stopPropagation(); e.preventDefault(); pasteEl(); }
     else if (mod && k === "d" && cur) { e.stopPropagation(); e.preventDefault(); elClip.current = JSON.parse(JSON.stringify(cur)); pasteEl(); }
-    else if ((e.key === "Delete" || e.key === "Backspace") && cur) { e.stopPropagation(); removeEl(cur.id); setActiveId(null); }
+    else if (e.key === "Delete" || e.key === "Backspace") {
+      const ids = (selIds.length ? selIds : (cur ? [cur.id] : [])).filter((id) => { const el = elements.find((x) => x.id === id); return el && !el.locked; });
+      if (ids.length) { e.stopPropagation(); removeMany(ids); setActiveId(null); setSelIds([]); }
+    }
+    else if (e.key === "Escape") { setActiveId(null); setSelIds([]); }
   };
   // 요소 선택 시 프레임에 포커스 → 단축키가 프레임에서 처리(보드 핸들러로 새지 않게)
   useEffect(() => {
@@ -645,14 +686,15 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
                 key={el.id}
                 el={el}
                 scale={rndScale}
-                active={activeId === el.id}
+                active={selIds.includes(el.id)}
                 editing={editId === el.id}
-                onSelect={() => setActiveId(el.id)}
+                onSelect={(e) => selectEl(el.id, e)}
                 onCycle={() => cycleSelect(el.id)}
                 onEdit={() => setEditId(el.id)}
                 onEndEdit={() => setEditId(null)}
                 onEnlarge={(src) => src && setLightboxSrc(src)}
                 onChange={(p) => updateEl(el.id, p)}
+                onMove={(x, y) => moveEl(el.id, x, y)}
               />
             ) : (
               <DesignEl key={el.id} el={el} />
@@ -672,9 +714,9 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
           onEnlarge={(src) => src && setLightboxSrc(src)}
           onRemove={() => {
             removeEl(activeEl.id);
-            setActiveId(null);
+            setActiveId(null); setSelIds([]);
           }}
-          onClose={() => setActiveId(null)}
+          onClose={() => { setActiveId(null); setSelIds([]); }}
         />
       )}
       <PhotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
@@ -842,6 +884,44 @@ function ControlPanel({ el, onChange, onReorder, onRemove, onClose, photos, deco
               <button className="dpanel-size" onClick={() => setSize(1)}>중간</button>
               <button className="dpanel-size" onClick={() => setSize(1.4)}>크게</button>
             </div>
+          </div>
+          {/* 텍스트 외곽선(stroke) */}
+          <div className="dpanel-sec">
+            <div className="dpanel-label">외곽선</div>
+            <div className="dpanel-btn-row">
+              <button
+                className={"dpanel-size" + (s.stroke ? "" : " on")}
+                onClick={() => setStyle({ stroke: undefined, strokeWidth: undefined })}
+              >없음</button>
+              <button
+                className={"dpanel-size" + (s.stroke ? " on" : "")}
+                onClick={() => setStyle({ stroke: s.stroke || "#FFFFFF", strokeWidth: s.strokeWidth ?? 3 })}
+              >켜기</button>
+            </div>
+            {s.stroke && (
+              <>
+                <div className="dpanel-btn-row" style={{ marginTop: 6 }}>
+                  <button className={"dpanel-size" + ((s.strokeWidth ?? 3) <= 2 ? " on" : "")} onClick={() => setStyle({ strokeWidth: 2 })}>얇게</button>
+                  <button className={"dpanel-size" + ((s.strokeWidth ?? 3) === 3 ? " on" : "")} onClick={() => setStyle({ strokeWidth: 3 })}>보통</button>
+                  <button className={"dpanel-size" + ((s.strokeWidth ?? 3) >= 5 ? " on" : "")} onClick={() => setStyle({ strokeWidth: 5 })}>두껍게</button>
+                </div>
+                <div className="dpanel-eyedrop" style={{ marginTop: 6 }}>
+                  <input
+                    type="color"
+                    className="dpanel-color-input"
+                    value={typeof s.stroke === "string" && /^#[0-9a-fA-F]{6}$/.test(s.stroke) ? s.stroke : "#ffffff"}
+                    onInput={(e) => setStyle({ stroke: e.target.value })}
+                    title="외곽선 색"
+                  />
+                  <span className="dpanel-eyedrop-label">외곽선 색</span>
+                </div>
+                <div className="dpanel-sw-row" style={{ marginTop: 6 }}>
+                  {["#FFFFFF", "#000000", "#5B53A8", "#E0791A", "#3E72A8", "#B05A82"].map((c) => (
+                    <button key={c} className="del-sw" style={{ background: c }} title={c} onClick={() => setStyle({ stroke: c })} />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
@@ -1128,7 +1208,7 @@ function CutoutImg({ src, fit, style }) {
   );
 }
 
-function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onEnlarge, onChange }) {
+function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onEnlarge, onChange, onMove }) {
   const s = el.style || {};
   const fill = { width: "100%", height: "100%", boxSizing: "border-box" };
   const isImage = el.type === "image" || el.type === "photo";
@@ -1191,7 +1271,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={() => { draggedRef.current = false; }}
       onDrag={() => { draggedRef.current = true; }}
-      onDragStop={(e, d) => onChange({ x: Math.round(d.x), y: Math.round(d.y) })}
+      onDragStop={(e, d) => (onMove ? onMove(d.x, d.y) : onChange({ x: Math.round(d.x), y: Math.round(d.y) }))}
       onResizeStop={(e, dir, ref, delta, pos) => {
         const nw = Math.round(parseFloat(ref.style.width));
         const nh = Math.round(parseFloat(ref.style.height));
@@ -1206,7 +1286,8 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       }}
       className={"del" + (active ? " del-active" : "")}
       // 도형은 선택해도 z-순서를 올리지 않음(z=1 유지) → 위에 놓인 사진·텍스트를 가리지 않고 함께 보며 편집(Canva 식)
-      style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1 }}
+      // 회전은 Rnd 박스 자체에 CSS rotate 로 적용 → 선택 상자(아웃라인)도 함께 기울어짐(피그마식). translate(위치)와 독립 속성이라 충돌 없음.
+      style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1, rotate: el.rotation ? `${el.rotation}deg` : undefined }}
     >
       <div
         className="del-inner"
@@ -1216,7 +1297,6 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           background: isImage ? s.bg : undefined,
           borderRadius: isImage ? imgRadius : 12,
           boxShadow: isImage ? s.shadow : undefined,
-          transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
         }}
         onDoubleClick={
           el.type === "text"
@@ -1454,6 +1534,8 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
     })();
     return () => {
       cancelled = true;
+      // 취소(예: StrictMode 이중호출/재렌더) 시 잠금 해제 → 다음 실행에서 재해석 가능
+      targets.forEach((e) => resolvingRef.current.delete(e.id));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant, page, pages]);
@@ -1463,6 +1545,20 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
     if (!pages) return;
     const next = pages.map((p, i) => (i === page ? { ...p, ...patch } : p));
     onUpdateData(item.id, { docs: { ...docs, [variant]: next } });
+  };
+  const canvasRef = useRef(null);
+  // 놀이기록 → PNG 저장(현재 페이지 캔버스). 미리보기 스케일 무시하고 A4 원본 해상도로 캡처.
+  const saveImage = async () => {
+    const node = canvasRef.current?.querySelector(".dframe");
+    if (!node) return;
+    const fr = pages?.[page]?.frame || { w: 794, h: 1123 };
+    const fileName = `${(data.title || "놀이기록").replace(/[\\/:*?"<>|]/g, "_")}-${variant}-${page + 1}.png`;
+    const opt = { width: fr.w, height: fr.h, pixelRatio: 2, cacheBust: false, style: { transform: "scale(1)", transformOrigin: "top left", margin: "0" } };
+    let dataUrl;
+    try { dataUrl = await toPng(node, { ...opt, skipFonts: false }); }
+    catch (e) { dataUrl = await toPng(node, { ...opt, skipFonts: true }); }
+    const a = document.createElement("a");
+    a.href = dataUrl; a.download = fileName; a.click();
   };
   const addPage = () => {
     const next = [...(pages || []), blankPage(data.payload)];
@@ -1503,7 +1599,8 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
             ))}
           </div>
           <div className="prdoc-pages">
-            <button onClick={addPhotoSlot} title="사진 자리 추가" style={{ width: "auto", padding: "0 9px", fontSize: 12.5, fontWeight: 700, whiteSpace: "nowrap" }}>🖼 사진＋</button>
+            <button onClick={saveImage} title="이미지로 저장 (PNG)" style={{ width: "auto", padding: "0 9px", display: "inline-flex", alignItems: "center" }}><Download size={15} /></button>
+            <button onClick={addPhotoSlot} title="사진 자리 추가" style={{ width: "auto", padding: "0 9px", display: "inline-flex", alignItems: "center" }}><ImagePlus size={16} /></button>
             <span className="prdoc-bar-div" />
             <button onClick={() => goPage(-1)} disabled={page <= 0} title="이전 페이지">‹</button>
             <span className="prdoc-pageno">{page + 1} / {pages ? pages.length : 1}</span>
@@ -1515,9 +1612,9 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
           </div>
         </div>
       )}
-      <div className="prdoc-canvas">
+      <div className="prdoc-canvas" ref={canvasRef}>
         {activeDoc ? (
-          <DesignFrame data={activeDoc} selected={selected} zoom={zoom} onChange={updatePage} photos={data.payload?.photos} decoAssets={payloadDecoAssets(data.payload)} />
+          <DesignFrame key={`${variant}-${page}`} data={activeDoc} selected={selected} zoom={zoom} onChange={updatePage} photos={data.payload?.photos} decoAssets={payloadDecoAssets(data.payload)} />
         ) : (
           <div className="prdoc-loading">불러오는 중…</div>
         )}

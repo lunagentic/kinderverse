@@ -86,6 +86,8 @@ app.post("/api/weekcard-image", async (req, res) => {
   if (!prompt) return res.status(400).json({ error: "prompt 가 필요합니다." });
   const size = req.body?.size || "1024x1024";
   const quality = req.body?.quality; // optional: low|medium|high|auto (스티커는 low)
+  const background = req.body?.background; // optional: "transparent" (스티커 PNG)
+  const imgModel = req.body?.model; // optional: gpt-image-1 (투명 배경 지원)
   const reference = req.body?.reference; // optional dataURL
   try {
     let img = null;
@@ -94,7 +96,7 @@ app.post("/api/weekcard-image", async (req, res) => {
       img = await generateImageWithReference(prompt, reference, { size, quality });
       usedReference = !!img;
     }
-    if (!img) img = await generateImage(prompt, { size, quality }); // 레퍼런스 미사용/실패 시 폴백
+    if (!img) img = await generateImage(prompt, { size, quality, background, model: imgModel }); // 레퍼런스 미사용/실패 시 폴백
     res.json({ src: img?.dataUrl || null, model: img?.model || null, usedReference });
   } catch (err) {
     console.error("[verse] weekcard-image error:", err);

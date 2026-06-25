@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-25-canvas-flow-removed";
+export const LAYOUT_VERSION = "2026-06-25-story-winter-pixar";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -258,24 +258,25 @@ function scatterStickers(m, theme, n, themeLabel = "", occupied = []) {
   return out;
 }
 
-// 캔버스형 고정 스티커 배치 — 현재 자동배치 결과를 그대로 고정(좌표·크기 불변). theme=true 는 큰 마스코트(에셋 교체 대상).
+// 캔버스형 고정 스티커 배치 — 디자이너가 편집한 배치/크기/회전을 디폴트로 고정.
+// (좌표·size·rot 불변. theme=true 는 큰 마스코트, x 음수는 의도적 가장자리 오버행)
 const CANVAS_STICKER_SPOTS = [
-  { x: 671, y: 92, size: 78, theme: true },
-  { x: 671, y: 316, size: 66, theme: true },
-  { x: 671, y: 428, size: 72, theme: true },
-  { x: 6, y: 540, size: 40 },
-  { x: 6, y: 652, size: 34 },
-  { x: 671, y: 652, size: 46 },
-  { x: 450, y: 2, size: 36 },
-  { x: 462, y: 92, size: 50 },
-  { x: 570, y: 92, size: 38 },
+  { x: 564, y: 700, size: 78, rot: 2, theme: true },
+  { x: 531, y: 254, size: 66, rot: 9, theme: true },
+  { x: 671, y: 428, size: 72, rot: -12, theme: true },
+  { x: 642, y: 810, size: 127, rot: 6 },
+  { x: 401, y: 243, size: 72, rot: -22 },
+  { x: 272, y: 694, size: 153, rot: 2 },
+  { x: -26, y: 388, size: 116, rot: -6 },
+  { x: 268, y: 80, size: 103, rot: 9 },
+  { x: 164, y: 90, size: 99, rot: -12 },
 ];
 function placeFixedStickers(m, theme, themeLabel, spots) {
   const deco = theme.deco || [];
-  // 좌표·크기는 고정. 모든 spot 을 기존 에셋 로드 대상으로(없으면 생성). placeholder 는 주제 이모지.
+  // 좌표·크기·회전 고정. 모든 spot 을 기존 에셋 로드 대상으로(없으면 생성). placeholder 는 주제 이모지.
   return spots.map((s, i) => {
     const ch = deco.length ? deco[i % deco.length] : KIDS_STICKERS[i % KIDS_STICKERS.length];
-    const rot = (i % 2 === 0 ? -1 : 1) * (6 + (i % 3) * 3);
+    const rot = s.rot ?? (i % 2 === 0 ? -1 : 1) * (6 + (i % 3) * 3);
     const el = m.emoji(s.x, s.y, s.size, ch, rot);
     el.stickerAsset = { themeKey: theme.key, themeLabel: themeLabel || theme.key, idx: i };
     return el;
@@ -411,7 +412,7 @@ export function buildCanvasDoc(payload) {
   if (line2) els.push(m.text(M, 142, 360, 92, line2, { fontSize: 70, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
   const introY = line2 ? 250 : 158;
   if (has(c.subtitle)) els.push(m.text(M + 4, introY, 330, 28, c.subtitle, { fontSize: 16, fontFamily: LABEL_FONT, color: th.badgeBg, align: "left", valign: "center" }));
-  if (has(c.intro)) els.push(m.text(M + 4, introY + 36, 332, 150, wrap30(c.intro, 22), { fontSize: 17, fontFamily: BODY_FONT, color: "#5b5246", align: "left", valign: "top" }));
+  if (has(c.intro)) els.push(m.text(M + 4, introY + 36, 332, 158, c.intro, { fontSize: fitFontSize(c.intro, 332, 158, 24), fontFamily: BODY_FONT, color: "#5b5246", align: "left", valign: "top" }));
 
   // 사진 (없으면 빈 슬롯) — 레퍼런스처럼 두꺼운 흰 폴라로이드 테두리 + 그림자
   SCATTER.forEach((p, i) => {
@@ -474,119 +475,107 @@ function arrowSeg(A, rA, B, rB, color, sign) {
   return { d, head, color };
 }
 
-// ════════════════════════════ 스토리형 ════════════════════════════
+// ════════════════════════════ 스토리형 (Figma 스크랩북) ════════════════════════════
+// 흩뿌린 폴라로이드 사진 13 + 번호 활동 카드 4 + 하단 흐름칩/패널 + 다수 스티커
+// (Figma node 2-365 좌표를 보더 13px 제하고 A4 794×1123 로 환산)
+const STORY_PHOTO_SLOTS = [
+  { x: 468, y: 13, w: 213, h: 171, r: 2 },
+  { x: 445, y: 287, w: 145, h: 189, r: -2 },
+  { x: 591, y: 292, w: 147, h: 186, r: 2 },
+  { x: 55, y: 333, w: 181, h: 138, r: -2 },
+  { x: 235, y: 351, w: 175, h: 130, r: 2 },
+  { x: 195, y: 490, w: 214, h: 128, r: -2 },
+  { x: 426, y: 487, w: 174, h: 128, r: 2 },
+  { x: 603, y: 487, w: 174, h: 128, r: -2 },
+  { x: 199, y: 636, w: 138, h: 189, r: 2 },
+  { x: 298, y: 642, w: 132, h: 186, r: -2 },
+  { x: 605, y: 640, w: 174, h: 129, r: 2 },
+  { x: 532, y: 753, w: 130, h: 101, r: -3 },
+  { x: 419, y: 761, w: 123, h: 91, r: 3 },
+];
+const STORY_ACT_CARDS = [
+  { x: 493, y: 146, w: 181, h: 138 },
+  { x: 28, y: 481, w: 196, h: 130 },
+  { x: 25, y: 668, w: 194, h: 131 },
+  { x: 425, y: 629, w: 171, h: 124 },
+];
+const STORY_FLOW_CHIPS = [
+  { x: 287, w: 100 }, { x: 396, w: 101 }, { x: 508, w: 97 }, { x: 615, w: 103 },
+];
+// 스티커 다수 — 큰 마스코트 + 사진 옆 작은 액센트. size = 이모지 fontSize(박스 = 1.5×size).
+// placeFixedStickers 가 stickerAsset{themeKey,idx} 태그 → 에디터 resolveSticker 로 테마 PNG 해석(정책 유지).
+const STORY_STICKER_SPOTS = [
+  { x: 5, y: 920, size: 120 },    // 북극곰(좌하) 큰 마스코트
+  { x: 683, y: 1008, size: 74 },  // 다람쥐(우하)
+  { x: 643, y: 127, size: 85 },   // 펭귄(우중)
+  { x: 295, y: 75, size: 72 },    // 아이·돋보기(제목 옆)
+  { x: 668, y: 13, size: 84 },    // 솔방울·열매(우상)
+  { x: 226, y: 8, size: 39 },     // 눈(상단)
+  { x: 39, y: 114, size: 29 },    // 눈(좌상)
+  { x: 681, y: 794, size: 64 },   // 펭귄(우 하단)
+  { x: 158, y: 625, size: 39 },   // 펭귄(중)
+  { x: 415, y: 268, size: 26 },   // 사진2 모서리
+  { x: 690, y: 282, size: 26 },   // 사진3 모서리
+  { x: 372, y: 338, size: 26 },   // 사진5 모서리
+  { x: 498, y: 480, size: 26 },   // 사진7 모서리
+  { x: 360, y: 632, size: 26 },   // 사진10 모서리
+];
+
 export function buildStoryDoc(payload) {
   const c = read(payload);
   const th = themeFor(`${c.meta.theme} ${c.title}`);
   const m = maker();
   const els = [m.bg({ bg: th.pageBg })];
-  const M = 40, W = A4.W;
 
-  // 헤더: 제목 + 놀이기록 배지 (아이콘 박스와 제목 박스가 겹치지 않게)
-  els.push(m.emoji(M - 2, 44, 56, th.deco[1] || "🌍", -4));
-  els.push(m.text(M + 96, 40, 458, 70, c.title, { fontSize: 52, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "center" }, { textRole: "title" }));
-  // 놀이기록 배지 — 상단 우측
-  els.push(m.shape(W - M - 150, 50, 150, 36, { bg: th.badgeBg, radius: 8 }));
-  els.push(m.text(W - M - 150, 50, 150, 36, "놀이기록", { fontSize: 18, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }));
+  // 제목 — 2톤·계단식("겨울" th.title / "놀이" th.accent)
+  const words = c.title.split(/\s+/);
+  const half = Math.ceil(words.length / 2);
+  const line1 = words.slice(0, half).join(" ");
+  const line2 = words.length > 1 ? words.slice(half).join(" ") : "";
+  els.push(m.text(51, 44, 330, 90, line1, { fontSize: 101, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
+  if (line2) els.push(m.text(94, 106, 330, 90, line2, { fontSize: 101, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
 
-  // 정보 칩 — 놀이기간 · 반이름 (좌측 2개)
-  const chips = [
-    ["🌱 놀이기간", has(c.month) ? c.month : (c.meta.period || "-")],
-    ["🌸 반이름", c.className || "-"],
-  ];
-  const chipColors = ["#E8F1FB", "#FBEAF1"]; // 소프트 블루·핑크
-  const chipText = ["#3E72A8", "#B05A82"];
-  const chipW = Math.floor((W - 2 * M - 3 * 12) / 4);
-  chips.forEach(([label, value], i) => {
-    const x = M + i * (chipW + 12);
-    els.push(m.shape(x, 162, chipW, 64, { bg: chipColors[i], radius: 14 }));
-    els.push(m.text(x + 14, 170, chipW - 24, 24, label, { fontSize: 14, fontFamily: LABEL_FONT, color: chipText[i], align: "left", valign: "center" }));
-    els.push(m.text(x + 14, 196, chipW - 24, 24, String(value), { fontSize: 15, fontFamily: BODY_FONT, color: "#4d453d", align: "left", valign: "center" }));
+  // 인트로(좌상단)
+  if (has(c.intro)) els.push(m.text(37, 212, 331, 118, c.intro, { fontSize: fitFontSize(c.intro, 331, 118, 16), fontFamily: "'Gaegu', cursive", color: "#5b5246", align: "left", valign: "top" }));
+
+  // 사진 슬롯 13 — 폴라로이드(흰 테두리+그림자), 번호·화살표 없음
+  STORY_PHOTO_SLOTS.forEach((p, i) => {
+    els.push(m.photo(p.x, p.y, p.w, p.h, c.photos[i] || null, { bg: "#fff", radius: 10, stroke: "#fff", strokeWidth: 8, shadow: "0 6px 16px rgba(40,30,20,0.18)" }, { rotation: p.r }));
   });
 
-  // 놀이의 흐름 — 상단 풀폭 밴드(사진을 중앙에 두기 위해 좌측 칼럼 제거)
-  els.push(m.shape(M, 238, 150, 30, { bg: th.accent, radius: 8 }));
-  els.push(m.text(M + 12, 238, 150, 30, "놀이의 흐름", { fontSize: 17, fontFamily: LABEL_FONT, color: "#fff", align: "left", valign: "center" }, { textRole: "title" }));
-  els.push(m.text(M, 276, W - 2 * M, 58, c.intro, { fontSize: fitFontSize(c.intro, W - 2 * M, 58, 15), fontFamily: BODY_FONT, color: "#4d453d", align: "left", valign: "top" }));
-  const quotes = c.activities.flatMap((a) => arr(a?.childQuotes)).filter(Boolean).slice(0, 2);
+  // 번호 활동 카드 4 — c.activities[0..3], 없으면 카드 숨김
+  STORY_ACT_CARDS.forEach((cd, i) => {
+    const a = c.activities[i];
+    if (!a) return;
+    els.push(m.shape(cd.x, cd.y, cd.w, cd.h, { bg: "#fffdf7", radius: 14, stroke: "#ece3d0", strokeWidth: 1.5, shadow: "0 6px 16px rgba(40,30,20,0.12)" }));
+    els.push(m.shape(cd.x + 11, cd.y + 11, 26, 26, { bg: th.accent, radius: 13, shadow: "0 2px 5px rgba(0,0,0,0.2)" }));
+    els.push(m.text(cd.x + 11, cd.y + 11, 26, 26, String(i + 1), { fontSize: 15, fontFamily: HEAD_FONT, color: "#fff", align: "center", valign: "center" }));
+    els.push(m.text(cd.x + 45, cd.y + 12, cd.w - 56, 24, a.title || `놀이 ${i + 1}`, { fontSize: 15, fontFamily: LABEL_FONT, color: th.title, align: "left", valign: "center" }, { textRole: "title" }));
+    if (has(a.summary)) els.push(m.text(cd.x + 16, cd.y + 44, cd.w - 30, cd.h - 54, a.summary, { fontSize: fitFontSize(a.summary, cd.w - 30, cd.h - 54, 12), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
+  });
 
-  // 번호 흐름 사진 12장 — 페이지 중앙에 정렬된 3열 그리드(정돈) + 곡선 점선 화살표
-  const fcols = 3, NPHOTO = 12, dBase = 125, cellW = 182; // 사진 슬롯 120% 확대
-  const gridW = fcols * cellW, fx = Math.round((W - gridW) / 2); // 가로 중앙 정렬
-  const startY = 350, rowH = 151;
-  const visCol = (i) => (Math.floor(i / fcols) % 2 === 1 ? fcols - 1 - (i % fcols) : i % fcols);
-  const sActs = c.activities.length ? c.activities : [{ title: c.title, summary: "" }];
+  // 하단 흐름 — 라벨 + 칩 4(활동 제목)
+  els.push(m.shape(187, 924, 90, 26, { bg: "#79b76e", radius: 13 }));
+  els.push(m.text(187, 924, 90, 26, "놀이의 흐름", { fontSize: 13, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }, { textRole: "title" }));
+  STORY_FLOW_CHIPS.forEach((ch, i) => {
+    const a = c.activities[i];
+    if (!a) return;
+    els.push(m.shape(ch.x, 924, ch.w, 26, { bg: "#f0ead9", radius: 13 }));
+    els.push(m.text(ch.x + 9, 924, ch.w - 14, 26, `${i + 1}. ${a.title || ""}`, { fontSize: 12, fontFamily: LABEL_FONT, color: "#6f6149", align: "left", valign: "center" }));
+  });
 
-  // 1) 정돈된 중심(지터 제거) — 회전만 약하게
-  const nodes = [];
-  for (let i = 0; i < NPHOTO; i++) {
-    const row = Math.floor(i / fcols), col = visCol(i);
-    const rot = (i % 2 === 0 ? -1 : 1) * (1.5 + (i % 3));
-    nodes.push({
-      cx: fx + col * cellW + cellW / 2,
-      cy: startY + row * rowH + dBase / 2,
-      size: dBase, r: dBase / 2, rot,
-    });
-  }
-
-  // 2) 곡선 점선 화살표(여러 색) — 사진 아래 레이어로 한 번에
-  const segments = [];
-  for (let i = 0; i < NPHOTO - 1; i++) {
-    segments.push(arrowSeg(
-      { x: nodes[i].cx, y: nodes[i].cy }, nodes[i].r,
-      { x: nodes[i + 1].cx, y: nodes[i + 1].cy }, nodes[i + 1].r,
-      ARROW_COLORS[i % ARROW_COLORS.length], i % 2 === 0 ? 1 : -1
-    ));
-  }
-  els.push({ id: "conn0", type: "connector", locked: true, x: 0, y: 0, w: A4.W, h: A4.H, segments });
-
-  // 3) 사진 + 번호 배지 (화살표 위)
-  for (let i = 0; i < NPHOTO; i++) {
-    const n = nodes[i];
-    const x = Math.round(n.cx - n.size / 2), y = Math.round(n.cy - n.size / 2);
-    const color = CARD_COLORS[i % CARD_COLORS.length];
-    els.push(m.photo(x, y, n.size, n.size, c.photos[i] || null, { radius: 14, stroke: "#fff", strokeWidth: 11, shadow: "0 5px 14px rgba(0,0,0,0.18)" }, { rotation: n.rot }));
-    els.push(m.shape(x - 6, y - 6, 28, 28, { bg: color, radius: 14, shadow: "0 2px 5px rgba(0,0,0,0.2)" }));
-    els.push(m.text(x - 6, y - 6, 28, 28, String(i + 1), { fontSize: 15, fontFamily: HEAD_FONT, color: "#fff", align: "center", valign: "center" }));
-  }
-
-  // 4) 캡션: 활동 텍스트를 12장에 반복 없이 자연스럽게 분배(사진 1~2장당 1개, 그룹 중앙 아래)
-  //    — 레퍼런스처럼 모든 사진 영역에 설명 텍스트가 닿도록, 활동 수가 적으면 2장이 한 캡션을 공유
-  const caps = (c.activities.length ? c.activities.map((a) => a.summary || a.title || "") : [c.intro]).filter(Boolean);
-  if (caps.length) {
-    const groups = {};
-    for (let i = 0; i < NPHOTO; i++) {
-      const g = Math.floor((i * caps.length) / NPHOTO);
-      (groups[g] = groups[g] || []).push(i);
-    }
-    Object.keys(groups).forEach((g) => {
-      const idxs = groups[g], cap = caps[g];
-      if (!cap) return;
-      const cxs = idxs.map((i) => nodes[i].cx);
-      const minX = Math.min(...cxs), maxX = Math.max(...cxs);
-      const bottom = Math.max(...idxs.map((i) => nodes[i].cy + nodes[i].size / 2));
-      const wCap = Math.min(cellW * idxs.length - 8, maxX - minX + cellW - 16);
-      const hCap = rowH - dBase - 6; // 행 사이 여백에 맞춤
-      els.push(m.text(
-        Math.round((minX + maxX) / 2 - wCap / 2), Math.round(bottom + 3), Math.round(wCap), hCap,
-        cap, { fontSize: fitFontSize(cap, wCap, hCap, 11), fontFamily: BODY_FONT, color: "#5a5048", align: "center", valign: "top" }
-      ));
-    });
-  }
-
-  // 하단 2패널
-  const py = startY + (NPHOTO / fcols) * rowH + 8; // 4행 아래
-  const pw = Math.floor((W - 2 * M - 16) / 2), ph = A4.H - py - 28;
-  const panel = (px, bg, mark, title, body) => {
-    els.push(m.shape(px, py, pw, ph, { bg, radius: 16 }));
-    els.push(m.text(px + 20, py + 14, pw - 40, 30, `${mark} ${title}`, { fontSize: 19, fontFamily: LABEL_FONT, color: th.title, align: "left", valign: "center" }, { textRole: "title" }));
-    const tw = pw - 40, tht = ph - 58;
-    els.push(m.text(px + 20, py + 48, tw, tht, body, { fontSize: fitFontSize(body, tw, tht, 14), fontFamily: BODY_FONT, color: "#4d453d", align: "left", valign: "top" }));
+  // 하단 패널 — 놀이 비법(learning) + 교사의 지원(support). 좌/우는 마스코트 자리로 비움.
+  const panel = (y, h, bg, badge, title, body, bodyH) => {
+    els.push(m.shape(181, y, 507, h, { bg, radius: 16, stroke: "#ece3d0", strokeWidth: 1.5 }));
+    els.push(m.shape(194, y + 12, 74, 24, { bg: badge, radius: 8 }));
+    els.push(m.text(194, y + 12, 74, 24, title, { fontSize: 13, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }, { textRole: "title" }));
+    if (has(body)) els.push(m.text(282, y + 12, 392, bodyH, body, { fontSize: fitFontSize(body, 392, bodyH, 13), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
   };
-  panel(M, th.learnBg, "★", c.learning.title || "놀이 속 배움", c.learning.text);
-  panel(M + pw + 16, th.supportBg, "♥", c.support.title || "교사의 지원", c.support.text);
+  panel(972, 75, th.learnBg, "#f9973f", c.learning.title || "놀이 비법", c.learning.text, 54);
+  panel(1063, 81, th.supportBg, "#418bc8", c.support.title || "교사의 지원", c.support.text, 60);
 
-  els.push(...scatterStickers(m, th, 9, c.meta.theme || c.title, occupiedRects(els)));
+  // 스티커 다수 — 기존 에셋 정책 유지(고정 스폿)
+  els.push(...placeFixedStickers(m, th, c.meta.theme || c.title, STORY_STICKER_SPOTS));
   return doc(c.title, th.pageBg, els);
 }
 
@@ -624,7 +613,7 @@ export function buildVariant(key, payload) {
 const VARIANT_PHOTO_SLOTS = {
   card: () => 9,
   canvas: () => SCATTER.length,
-  story: () => 12,
+  story: () => STORY_PHOTO_SLOTS.length,
 };
 
 // 추가 사진 페이지(둥근 사각형 3열 그리드) — 첫 페이지에 못 담은 사진을 9장씩 채운다.

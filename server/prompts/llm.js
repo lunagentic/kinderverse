@@ -108,10 +108,12 @@ export function canGenerateImage() {
 export async function generateImage(prompt, opts = {}) {
   if (!canGenerateImage()) return null;
   const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
-  const model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"; // 최신 (2026-04 출시)
+  const model = opts.model || process.env.OPENAI_IMAGE_MODEL || "gpt-image-2"; // 최신 (2026-04 출시)
   const size = opts.size || process.env.OPENAI_IMAGE_SIZE || "1024x1024";
   // 비용 절감: 기본 medium. 호출부(opts.quality) > 환경변수 > 기본(medium). 스티커는 호출부에서 low 지정.
   const quality = opts.quality || process.env.OPENAI_IMAGE_QUALITY || "medium"; // low|medium|high|auto
+  const body = { model, prompt, size, quality, n: 1 };
+  if (opts.background) body.background = opts.background; // "transparent" → 투명 PNG(스티커용)
   try {
     const res = await fetch(`${base}/images/generations`, {
       method: "POST",
@@ -119,7 +121,7 @@ export async function generateImage(prompt, opts = {}) {
         "content-type": "application/json",
         authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({ model, prompt, size, quality, n: 1 }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       console.warn(`[kinderverse] 이미지 ${res.status} — SVG 목업으로 폴백`);

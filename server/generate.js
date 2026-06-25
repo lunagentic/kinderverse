@@ -60,6 +60,7 @@ function detectFeature(prompt) {
   if (has("놀이기록", "놀이 기록", "기록")) return "play_story";
   if (has("안내문", "가정통신문")) return "project_notice";
   if (has("미션", "놀이미션", "미션카드")) return "mission_card";
+  if (has("주제망", "주제 그물", "주제그물", "주제 망")) return "topic_web";
   if (has("프로젝트")) return "project_plan";
   if (has("월안", "월간")) return "monthly_plan";
   if (has("주안", "주간")) return "weekly_plan";
@@ -73,6 +74,7 @@ function titleOf(featureId, payload, ctx) {
   const bi = payload?.basic_info || {};
   return (
     payload?.header?.title ||
+    payload?.topic_web?.main_topic ||
     bi.project_title ||
     payload?.play_name ||
     (bi.theme && bi.sub_theme && `${bi.theme} · ${bi.sub_theme}`) ||
@@ -91,6 +93,7 @@ const PLAN_SIZES = {
   daily_plan: { w: 420, h: 480 },
   project_plan: { w: 440, h: 500 },
   project_notice: { w: 400, h: 460 },
+  topic_web: { w: 460, h: 560 },
 };
 
 const REPLY = {
@@ -102,6 +105,7 @@ const REPLY = {
   daily_plan: "일일 놀이계획(일안)",
   project_plan: "프로젝트 계획안",
   project_notice: "프로젝트 안내문",
+  topic_web: "놀이중심 주제망",
 };
 
 async function generatePlan(featureId, prompt, images = []) {
@@ -294,6 +298,29 @@ export async function convertItem({ format, title, content, variant }) {
   }
 
   if (format === "image") {
+    // 주제망 — 마인드맵형 인포그래픽 (사진 없이 일러스트)
+    if (variant === "topicweb") {
+      const prompt = [
+        `한국 유아교육용 '놀이중심 주제망(마인드맵)' 인포그래픽 포스터를 1장 디자인해줘.`,
+        `대주제: "${t}".`,
+        `주제망 내용(대주제 → 소주제 → 놀이 아이디어, 그리고 환경 구성·유아의 예상 질문):`,
+        text.slice(0, 900),
+        `레이아웃: 가운데에 큰 원형 노드(대주제 제목 + 귀여운 주제 일러스트). 그 둘레에 번호가 매겨진 소주제 원 5~6개를 방사형으로 배치하고, 각 소주제 원은 색이 서로 다르며(파랑·초록·핑크·보라·노랑) 작은 아이콘 일러스트와 1~2줄 설명을 담는다. 각 소주제 원은 가운데 대주제와 선으로 연결하고, 바로 옆에 같은 색 테두리의 둥근 '놀이 아이디어' 박스(불릿 목록)를 연결한다. 맨 아래에는 둥근 패널 2개: 왼쪽 '환경 구성'(집 아이콘 + 작은 아이콘이 붙은 항목을 2열로), 오른쪽 '유아의 예상 질문'(물음표 아이콘 + 질문을 2열로). 맨 아래 가운데에는 한 줄 요약 알약 배너(별·하트 장식).`,
+        `스타일: 부드러운 파스텔 색감, 둥근 손글씨풍 한글, 귀엽고 깔끔한 유아 일러스트, 흰 배경, 마인드맵형 인포그래픽. 사진은 넣지 말고 전부 일러스트로. 세로형 포스터.`,
+        `한국어 텍스트는 정확하고 읽기 쉽게.`,
+      ].join("\n");
+      const img = await generateImage(prompt, { size: "1024x1024" });
+      if (img) {
+        return {
+          items: [{ type: "image", data: { src: img.dataUrl, alt: t, source: "openai", model: img.model }, size: { w: 460, h: 460 } }],
+          reply: `주제망 "${t}" 이미지를 GPT(${img.model})로 만들었어요.`,
+        };
+      }
+      return {
+        items: [{ type: "image", data: { src: svgMockImage(t), alt: t, source: "mock" }, size: { w: 360, h: 360 } }],
+        reply: `주제망 "${t}" 이미지(목업)를 만들었어요. .env 에 OPENAI_API_KEY 설정 시 실제 이미지 생성.`,
+      };
+    }
     const variantStyle = IMAGE_VARIANT_STYLE[variant];
     const prompt = [
       `한국 유아교육용 '놀이기록' 인포그래픽 포스터를 1장 디자인해줘.`,

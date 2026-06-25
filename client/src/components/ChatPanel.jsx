@@ -10,6 +10,7 @@ import {
   Target,
   Mail,
   BookOpen,
+  Network,
   ImagePlus,
   X,
   AlertTriangle,
@@ -35,6 +36,7 @@ const MONTHLY_PLAY_THEMES = {
 
 // 추천 버튼: 유치원 문서 7종. 현재 월/대표 주제를 프롬프트에 반영
 const DOC_TYPES = [
+  { label: "주제망", Icon: Network, build: (m, t) => `'${t}' 놀이중심 주제망 만들어줘` },
   { label: "놀이 아이디어", Icon: Lightbulb, build: (m, t) => `${m}월 '${t}' 놀이 아이디어 만들어줘` },
   { label: "일안", Icon: ClipboardList, build: (m) => `${m}월 일일교육계획안(일안) 만들어줘` },
   { label: "월안", Icon: CalendarDays, build: (m, t) => `${m}월 '${t}' 월간교육계획안(월안) 만들어줘` },
@@ -208,6 +210,25 @@ function playStoryToText(p) {
   return S.join("\n\n");
 }
 
+function topicWebToText(p) {
+  const web = p.topic_web || {};
+  const S = [];
+  if (web.main_topic) S.push(`■ 대주제\n${web.main_topic}`);
+  const subs = arr(web.subtopics);
+  if (subs.length)
+    S.push(
+      "■ 소주제 · 놀이\n" +
+        subs
+          .map((s) => `· ${s.subtopic}\n` + arr(s.play_ideas).map((pi) => `   - ${pi}`).join("\n"))
+          .join("\n")
+    );
+  if (arr(p.environment_setup).length)
+    S.push("■ 환경 구성\n" + arr(p.environment_setup).map((x) => `· ${x}`).join("\n"));
+  if (arr(p.children_expected_questions).length)
+    S.push("■ 유아의 예상 질문\n" + arr(p.children_expected_questions).map((x) => `· ${x}`).join("\n"));
+  return S.join("\n\n");
+}
+
 function planToText(item) {
   const d = item?.data;
   if (!d) return "";
@@ -215,6 +236,7 @@ function planToText(item) {
   if (d.feature_id === "monthly_plan") return monthlyToText(p);
   if (d.feature_id === "play_idea") return playIdeaToText(p);
   if (d.feature_id === "play_story") return playStoryToText(p);
+  if (d.feature_id === "topic_web") return topicWebToText(p);
   return genericToText(p);
 }
 

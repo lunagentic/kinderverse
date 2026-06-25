@@ -157,8 +157,8 @@ export default function BoardItem({
 
       {item.type === "plan" && onConvert && item.data?.feature_id !== "play_idea" && (
         <div className="node-actions" onPointerDown={(e) => e.stopPropagation()}>
-          {/* 놀이기록은 문서 버튼 숨김 */}
-          {item.data?.feature_id !== "play_story" && (
+          {/* 놀이기록·주제망은 문서 버튼 숨김 (이미지·편집 디자인만) */}
+          {!["play_story", "topic_web"].includes(item.data?.feature_id) && (
             <button onClick={() => onConvert(item, "document")} title="문서">
               <FileText size={13} />
             </button>
@@ -196,6 +196,15 @@ export default function BoardItem({
                 )}
               </span>
               <button onClick={() => onConvert(item, "design")} title="편집 디자인 (캔버스)">
+                <Palette size={13} />
+              </button>
+            </>
+          ) : item.data?.feature_id === "topic_web" ? (
+            <>
+              <button onClick={() => onConvert(item, "image", { variant: "topicweb" })} title="이미지 (주제망)">
+                <ImageIcon size={13} />
+              </button>
+              <button onClick={() => onConvert(item, "design")} title="편집 디자인">
                 <Palette size={13} />
               </button>
             </>
@@ -1527,11 +1536,13 @@ const FEATURE_LABEL = {
   daily_plan: "일일 놀이계획",
   project_plan: "프로젝트 계획안",
   project_notice: "프로젝트 안내문",
+  topic_web: "놀이중심 주제망",
 };
 
 // 유형별 배지 색상 (아이디어 vs 월안 등 한눈에 구분)
 const FEATURE_BADGE_COLOR = {
   play_story: "#4a90b8", // 파랑(놀이기록)
+  topic_web: "#c2613f", // 테라코타(주제망)
   play_idea: "#2fa6a0", // 청록
   mission_card: "#e07a5f", // 코랄
   monthly_plan: "#d97757", // 주황(월안)

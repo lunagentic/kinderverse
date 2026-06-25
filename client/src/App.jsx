@@ -140,6 +140,18 @@ function cardToContent(item) {
       ].filter(Boolean).join("\n");
       return { title: d.title || p.header?.title || "놀이기록", content };
     }
+    // 주제망: 마인드맵 이미지/디자인용 텍스트 (대주제 → 소주제 → 놀이 + 환경·질문)
+    if (d.feature_id === "topic_web") {
+      const web = p.topic_web || {};
+      const subs = (web.subtopics || [])
+        .map((s) => `· ${s.subtopic}\n` + (s.play_ideas || []).map((pi) => `   - ${pi}`).join("\n"));
+      const content = [
+        subs.length ? `소주제 · 놀이:\n${subs.join("\n")}` : "",
+        (p.environment_setup || []).length ? `환경 구성:\n` + p.environment_setup.map((x) => `- ${x}`).join("\n") : "",
+        (p.children_expected_questions || []).length ? `유아의 예상 질문:\n` + p.children_expected_questions.map((x) => `- ${x}`).join("\n") : "",
+      ].filter(Boolean).join("\n");
+      return { title: d.title || web.main_topic || "주제망", content };
+    }
     // 놀이아이디어는 깔끔한 문장으로 추출
     if (Array.isArray(p.ideas) && p.ideas[0]) {
       const idea = p.ideas[0];

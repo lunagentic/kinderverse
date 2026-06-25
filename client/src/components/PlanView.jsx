@@ -598,7 +598,34 @@ function Generic({ value, depth = 0 }) {
   return <span className="pv-text">{String(value)}</span>;
 }
 
+// 놀이중심 주제망 (topic_web / TopicWeb)
+function TopicWebView({ d }) {
+  const web = d.topic_web || {};
+  const subs = arr(web.subtopics);
+  const palette = ["#2f6df6", "#34a853", "#e0791a", "#9b51e0", "#e91e8c", "#0aa1d6", "#3fae6a", "#ef8e6a"];
+  return (
+    <div>
+      <div className="pv-web-main">{web.main_topic || d.theme || "주제망"}</div>
+      <Section title="소주제 · 놀이">
+        {subs.map((s, i) => (
+          <div className="pv-web-branch" key={i} style={{ borderLeftColor: palette[i % palette.length] }}>
+            <div className="pv-web-sub" style={{ color: palette[i % palette.length] }}>{s.subtopic}</div>
+            <div className="pv-web-ideas">
+              {arr(s.play_ideas).map((p, j) => (
+                <span className="pv-web-idea" key={j}>{String(p)}</span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Section>
+      <Bullets label="환경 구성" items={d.environment_setup} Icon={Home} />
+      <Bullets label="유아의 예상 질문" items={d.children_expected_questions} Icon={HelpCircle} />
+    </div>
+  );
+}
+
 const RENDERERS = {
+  topic_web: TopicWebView,
   play_story: PlayStoryView,
   play_idea: PlayIdeaView,
   mission_card: MissionCardView,

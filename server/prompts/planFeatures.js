@@ -691,4 +691,52 @@ export const PLAN_FEATURES = {
       },
     },
   },
+
+  // ── 3.7 놀이중심 주제망 (agent.plan) ──
+  topic_web: {
+    feature_id: "topic_web",
+    agent: "agent.plan",
+    output_type: "TopicWeb",
+    label: "주제망",
+    role: `교사가 입력한 대주제·연령·생활주제·계절·프로젝트 키워드를 바탕으로, 유아의 흥미와 놀이 흐름이 드러나는 '놀이중심 주제망(TopicWeb)'을 생성한다. 단순 개념 나열이 아니라 대주제 → 소주제(탐색·관심 영역) → 놀이 아이디어(실제 교실에서 실행 가능한 놀이명)로 확장되며, 이후 놀이아이디어·월안·주안·일안·프로젝트 계획안으로 확장 가능한 기반 데이터로 쓰인다. 환경 구성과 유아의 예상 질문을 반드시 포함한다.`,
+    rules: [
+      "0~2세는 2024 개정 표준보육과정, 3~5세는 2019 개정 누리과정을 기준으로 하며 놀이의 자발성·주도성·탐색성을 우선한다.",
+      "지식 전달 중심의 개념망이 아니라 유아의 경험과 놀이 확장을 중심으로 구성하고, 연령에 부적합한 실험·설명·활동은 생성하지 않는다.",
+      "소주제는 활동명이 아니라 탐색 영역·관심 영역으로 짧고 명확하게 작성하며, 유아의 경험 세계와 연결한다.",
+      "소주제는 기본 4~6개 생성하되 subtopic_count 가 있으면 그 개수에 맞춘다.",
+      "각 소주제마다 놀이 아이디어 3~5개를 생성하되 idea_count_per_subtopic 이 있으면 그 개수에 맞춘다. 놀이명은 짧고 구체적으로, 설명 없이 놀이명 중심으로 작성한다.",
+      "놀이 흐름은 가능한 한 '관심 → 탐색 → 표현 → 확장 → 공유'를 반영하고, 교사 주도보다 유아 주도 놀이가 드러나게 하며 동일한 놀이 유형을 반복하지 않는다.",
+      "놀이 유형은 신체·감각탐색·역할·언어·미술표현·음악동작·쌓기구성·과학탐구·자연탐색·협동놀이를 고르게 고려한다.",
+      "환경 구성(environment_setup)은 탐색 자료·역할놀이 소품·그림책/언어 자료·게시판 구성·유아 작품 전시·관찰기록 공간·안전 자료를 고려해 교실 환경으로 전환 가능하게 작성한다.",
+      "유아의 예상 질문(children_expected_questions)은 '왜/어떻게/무엇일까/무엇이 다를까/어떻게 하면 될까' 유형으로 호기심과 탐구 가능성이 드러나게 작성한다.",
+    ],
+    input_schema: {
+      age_band: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      project_mode: false,
+      subtopic_count: 5,
+      idea_count_per_subtopic: 4,
+      teacher_preference: {},
+      class_context: {},
+    },
+    output_schema: {
+      output_type: "TopicWeb",
+      feature_id: "topic_web",
+      age_band: "",
+      theme: "",
+      life_theme: "",
+      season: "",
+      project_mode: false,
+      topic_web: {
+        main_topic: "",
+        subtopics: [
+          { subtopic: "", play_ideas: ["", "", ""] },
+        ],
+      },
+      environment_setup: ["", "", ""],
+      children_expected_questions: ["", "", ""],
+    },
+  },
 };

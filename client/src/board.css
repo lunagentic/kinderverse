@@ -1589,3 +1589,20 @@ body,
   pointer-events: none; background: var(--accent); color: #fff; font-weight: 700;
   font-size: 13px; padding: 8px 16px; border-radius: 999px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
+
+/* 놀이중심 주제망 (TopicWeb) */
+.pv-web-main {
+  text-align: center;
+  background: linear-gradient(135deg, #d97757, #e8a87c);
+  color: #fff; font-weight: 800; font-size: 17px;
+  padding: 9px 16px; border-radius: 999px;
+  margin: 2px auto 12px; width: fit-content; max-width: 100%;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+.pv-web-branch { border-left: 3px solid #ccc; padding: 3px 0 8px 12px; margin-bottom: 8px; }
+.pv-web-sub { font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+.pv-web-ideas { display: flex; flex-wrap: wrap; gap: 5px; }
+.pv-web-idea {
+  background: #f3efe9; border: 1px solid #e6ddd2; color: #4d453d;
+  font-size: 12px; padding: 4px 9px; border-radius: 8px;
+}

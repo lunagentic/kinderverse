@@ -36,6 +36,7 @@ export default function BoardItem({
   onConvert,
   onEditCard,
   onMakeWeekCard,
+  onAddImages,
 }) {
   const [editing, setEditing] = useState(false);
   const [imgMenu, setImgMenu] = useState(false); // 놀이기록 이미지 유형 선택 메뉴
@@ -231,6 +232,7 @@ export default function BoardItem({
         selected={selected}
         zoom={zoom}
         onEditCard={onEditCard}
+        onAddImages={onAddImages}
       />
 
       {selected && (
@@ -267,7 +269,7 @@ function WeekCardPreview({ item, data, onEditCard }) {
   );
 }
 
-function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, selected, zoom, onEditCard }) {
+function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, selected, zoom, onEditCard, onAddImages }) {
   const { type, data } = item;
   const stop = (e) => e.stopPropagation();
 
@@ -296,6 +298,7 @@ function NodeContent({ item, editing, setEditing, onUpdate, onUpdateData, select
         zoom={zoom}
         onUpdate={onUpdate}
         onUpdateData={onUpdateData}
+        onAddImages={onAddImages}
       />
     );
   }
@@ -1352,7 +1355,12 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={() => { draggedRef.current = false; }}
       onDrag={() => { draggedRef.current = true; }}
-      onDragStop={(e, d) => (onMove ? onMove(d.x, d.y) : onChange({ x: Math.round(d.x), y: Math.round(d.y) }))}
+      onDragStop={(e, d) => {
+        // 클릭(실제 드래그 아님)이면 위치를 갱신하지 않음 → 선택만 했는데 배열이 틀어지는 문제 방지
+        if (!draggedRef.current) return;
+        if (onMove) onMove(d.x, d.y);
+        else onChange({ x: Math.round(d.x), y: Math.round(d.y) });
+      }}
       onResizeStop={(e, dir, ref, delta, pos) => {
         const nw = Math.round(parseFloat(ref.style.width));
         const nh = Math.round(parseFloat(ref.style.height));
@@ -1572,7 +1580,7 @@ function DesignCard({ item, data, editing, setEditing, onUpdateData, stop }) {
 }
 
 // ── 놀이기록 편집기: 3유형 토글 + A4 페이지 + 자유 캔버스(DesignFrame) ──
-function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
+function PlayRecordEditor({ item, data, selected, zoom, onUpdateData, onAddImages }) {
   const variant = data.variant || "card";
   const docs = data.docs || {};
   const pages = docs[variant];
@@ -1670,8 +1678,11 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData }) {
     let dataUrl;
     try { dataUrl = await toPng(node, { ...opt, skipFonts: false }); }
     catch (e) { dataUrl = await toPng(node, { ...opt, skipFonts: true }); }
+    // 1) 파일로 다운로드
     const a = document.createElement("a");
     a.href = dataUrl; a.download = fileName; a.click();
+    // 2) 보드에도 저장 — 렌더된 PNG를 카드 오른쪽에 이미지 아이템으로 추가
+    onAddImages?.([dataUrl], { x: item.x + item.w + 180, y: item.y + 150 });
   };
   const addPage = () => {
     const next = [...(pages || []), blankPage(data.payload)];

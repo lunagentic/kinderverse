@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-25-story-winterfixed";
+export const LAYOUT_VERSION = "2026-06-26-story-winter-ref";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -522,22 +522,26 @@ const STORY_STICKER_SPOTS = [
   { x: 498, y: 480, size: 26 },   // 사진7 모서리
   { x: 360, y: 632, size: 26 },   // 사진10 모서리
 ];
-// 겨울 스토리 기본 디자인 — 디자이너가 큐레이션한 스티커 에셋·좌표·크기·회전·반전 고정
-// (돋보기아이=제목 옆, 펭귄=우상단 반전, 다람쥐=하단, 눈송이 본·복제, 솔방울·곰 등 가장자리 마스코트)
+// 겨울 스토리 기본 디자인 — 레퍼런스('겨울의 즐거움') 구성: 캐릭터·배경(눈송이)·액센트(테이프/장갑)를 균형 배치.
+// 캐릭터는 가장자리(북극곰 좌하·펭귄 우상/우중·다람쥐 우), 눈송이는 작게 흩뿌림, 깅엄 테이프·장갑은 액센트.
 const STORY_WINTER_STICKERS = [
-  { src: "/generated-assets/stk-winter-1.png", x: 275, y: 79, w: 180, h: 180, rot: -6, flip: false }, // 돋보기 아이
-  { src: "/generated-assets/stk-winter-2.png", x: 637, y: 92, w: 156, h: 156, rot: 9, flip: true },   // 펭귄(우상단)
-  { src: "/generated-assets/stk-winter-3.png", x: 351, y: 1044, w: 128, h: 128, rot: -16, flip: true }, // 다람쥐(하단)
-  { src: "/generated-assets/stk-winter-4.png", x: 217, y: -23, w: 108, h: 108, rot: 6, flip: false },  // 눈송이(상단)
-  { src: "/generated-assets/stk-winter-4.png", x: 182, y: 604, w: 63, h: 63, rot: 6, flip: false },    // 눈송이(소)
-  { src: "/generated-assets/stk-winter-4.png", x: 415, y: 228, w: 63, h: 63, rot: 6, flip: false },
-  { src: "/generated-assets/stk-winter-4.png", x: 29, y: 135, w: 63, h: 63, rot: 6, flip: false },
-  { src: "/assets/deco/stk-winter-1.png", x: 668, y: 13, w: 126, h: 126, rot: -9, flip: false },  // 솔방울·열매(우상)
-  { src: "/assets/deco/stk-winter-2.png", x: -14, y: 17, w: 59, h: 59, rot: 12, flip: false },
-  { src: "/assets/deco/stk-winter-3.png", x: -34, y: 368, w: 125, h: 125, rot: -6, flip: false }, // 곰(좌 가장자리)
-  { src: "/assets/deco/stk-winter-4.png", x: 365, y: 798, w: 80, h: 80, rot: 9, flip: false },
-  { src: "/assets/deco/stk-winter-5.png", x: 553, y: 875, w: 126, h: 126, rot: -12, flip: false },
-  { src: "/assets/deco/stk-winter-8.png", x: 372, y: 338, w: 39, h: 39, rot: 12, flip: false },
+  // 캐릭터 (큰 마스코트, 네 귀퉁이 균형)
+  { src: "/generated-assets/stk-winter-5.png", x: 4, y: 928, w: 176, h: 176, rot: 4, flip: false },   // 북극곰 (좌하, 大)
+  { src: "/generated-assets/stk-winter-2.png", x: 628, y: 20, w: 150, h: 150, rot: 8, flip: true },    // 펭귄 (우상)
+  { src: "/generated-assets/stk-winter-2.png", x: 668, y: 470, w: 116, h: 116, rot: -7, flip: false }, // 펭귄 (우중)
+  { src: "/generated-assets/stk-winter-3.png", x: 700, y: 626, w: 110, h: 110, rot: 10, flip: false }, // 다람쥐 (우)
+  { src: "/generated-assets/stk-winter-3.png", x: 690, y: 1004, w: 122, h: 122, rot: -10, flip: true },// 다람쥐 (우하)
+  { src: "/generated-assets/stk-winter-1.png", x: 246, y: 50, w: 92, h: 92, rot: -6, flip: false },    // 돋보기 아이 (제목 옆, 小)
+  // 배경: 눈송이 (작게 흩뿌림)
+  { src: "/generated-assets/stk-winter-4.png", x: 226, y: 4, w: 52, h: 52, rot: 6, flip: false },
+  { src: "/generated-assets/stk-winter-4.png", x: 560, y: 14, w: 46, h: 46, rot: -8, flip: false },
+  { src: "/generated-assets/stk-winter-4.png", x: 14, y: 300, w: 44, h: 44, rot: 6, flip: false },
+  { src: "/generated-assets/stk-winter-4.png", x: 742, y: 250, w: 42, h: 42, rot: 12, flip: false },
+  { src: "/generated-assets/stk-winter-4.png", x: 392, y: 556, w: 38, h: 38, rot: -6, flip: false },
+  // 액센트: 깅엄 테이프 + 벙어리장갑
+  { src: "/generated-assets/deco-gingham-1.png", x: 404, y: 196, w: 96, h: 96, rot: -10, flip: false },
+  { src: "/generated-assets/deco-gingham-2.png", x: 556, y: 690, w: 96, h: 96, rot: 8, flip: false },
+  { src: "/generated-assets/stk-winter-6.png", x: 330, y: 1004, w: 96, h: 96, rot: 6, flip: false },   // 벙어리장갑 (하단 중앙)
 ];
 
 export function buildStoryDoc(payload) {

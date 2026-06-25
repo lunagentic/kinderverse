@@ -20,6 +20,8 @@ const FALLBACK_DECO: Record<string, string[]> = {
     "/generated-assets/stk-winter-2.png",
     "/generated-assets/stk-winter-3.png",
     "/generated-assets/stk-winter-4.png",
+    "/generated-assets/stk-winter-5.png",
+    "/generated-assets/stk-winter-6.png",
   ],
   default: ["/assets/deco/rainbow.png", "/assets/deco/cloud.png", "/assets/deco/sun.png"],
 };

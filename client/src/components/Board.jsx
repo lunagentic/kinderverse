@@ -179,6 +179,7 @@ const Board = forwardRef(function Board(
             onConvert={onConvert}
             onEditCard={onEditCard}
             onMakeWeekCard={onMakeWeekCard}
+            onAddImages={onAddImages}
           />
         ))}
       </div>

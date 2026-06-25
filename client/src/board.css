@@ -1606,3 +1606,17 @@ body,
   background: #f3efe9; border: 1px solid #e6ddd2; color: #4d453d;
   font-size: 12px; padding: 4px 9px; border-radius: 8px;
 }
+
+/* 선택 요소 위 플로팅 툴바 (복사·반전·회전·삭제) */
+.del-fbar {
+  display: flex; gap: 2px; background: #fff;
+  border: 1px solid #e3dccd; border-radius: 9px; padding: 3px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2); z-index: 40; white-space: nowrap;
+}
+.del-fbar button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 26px; border: none; background: transparent;
+  border-radius: 6px; color: #5a5046; cursor: pointer; padding: 0;
+}
+.del-fbar button:hover { background: #f0ead9; }
+.del-fbar .del-fbar-x:hover { background: #fde2e2; color: #d9534f; }

@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-25-story-winter-pixar";
+export const LAYOUT_VERSION = "2026-06-25-story-actcolors";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -499,6 +499,8 @@ const STORY_ACT_CARDS = [
   { x: 25, y: 668, w: 194, h: 131 },
   { x: 425, y: 629, w: 171, h: 124 },
 ];
+// 활동명/번호 배지 색 — 레퍼런스 순서: 파랑·초록·연보라·핑크
+const STORY_ACT_COLORS = ["#3E72A8", "#5AA46A", "#9B7FC9", "#D173A0"];
 const STORY_FLOW_CHIPS = [
   { x: 287, w: 100 }, { x: 396, w: 101 }, { x: 508, w: 97 }, { x: 615, w: 103 },
 ];
@@ -548,9 +550,10 @@ export function buildStoryDoc(payload) {
     const a = c.activities[i];
     if (!a) return;
     els.push(m.shape(cd.x, cd.y, cd.w, cd.h, { bg: "#fffdf7", radius: 14, stroke: "#ece3d0", strokeWidth: 1.5, shadow: "0 6px 16px rgba(40,30,20,0.12)" }));
-    els.push(m.shape(cd.x + 11, cd.y + 11, 26, 26, { bg: th.accent, radius: 13, shadow: "0 2px 5px rgba(0,0,0,0.2)" }));
+    const acol = STORY_ACT_COLORS[i % STORY_ACT_COLORS.length];
+    els.push(m.shape(cd.x + 11, cd.y + 11, 26, 26, { bg: acol, radius: 13, shadow: "0 2px 5px rgba(0,0,0,0.2)" }));
     els.push(m.text(cd.x + 11, cd.y + 11, 26, 26, String(i + 1), { fontSize: 15, fontFamily: HEAD_FONT, color: "#fff", align: "center", valign: "center" }));
-    els.push(m.text(cd.x + 45, cd.y + 12, cd.w - 56, 24, a.title || `놀이 ${i + 1}`, { fontSize: 15, fontFamily: LABEL_FONT, color: th.title, align: "left", valign: "center" }, { textRole: "title" }));
+    els.push(m.text(cd.x + 45, cd.y + 12, cd.w - 56, 24, a.title || `놀이 ${i + 1}`, { fontSize: 15, fontFamily: LABEL_FONT, color: acol, align: "left", valign: "center" }, { textRole: "title" }));
     if (has(a.summary)) els.push(m.text(cd.x + 16, cd.y + 44, cd.w - 30, cd.h - 54, a.summary, { fontSize: fitFontSize(a.summary, cd.w - 30, cd.h - 54, 12), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
   });
 

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Rnd } from "react-rnd";
 import { cutout as runCutout } from "../editor/cutout";
-import { X, FileText, Image as ImageIcon, Palette, ImagePlus, Download } from "lucide-react";
+import { X, FileText, Image as ImageIcon, Palette, ImagePlus, Download, Copy, FlipHorizontal, RotateCw } from "lucide-react";
 import { toPng } from "html-to-image";
 import PlanView from "./PlanView.jsx";
 import Loader from "./Loader.jsx";
@@ -598,6 +598,29 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
     }
     setActiveId(id);
   };
+  const duplicateEl = (id) => {
+    const src = elements.find((e) => e.id === id);
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    copy.x = Math.round((copy.x || 0) + 18);
+    copy.y = Math.round((copy.y || 0) + 18);
+    commit([...elements, copy]);
+    setActiveId(copy.id); setSelIds([copy.id]);
+  };
+  // 빈 공간 선택(아무 요소도 선택 안 됨) 상태에서 꾸미기 그림을 누르면 새 스티커로 추가
+  const addDecoEl = (url) => {
+    const W = 130, n = elements.length, off = (n % 6) * 16 - 40;
+    const el = {
+      id: `el_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      type: "image", src: url, fit: "contain", cutout: false, sticker: true,
+      x: Math.round(frame.w / 2 - W / 2 + off), y: Math.round(frame.h / 2 - W / 2 + off),
+      w: W, h: W, rotation: 0, style: { radius: 0 },
+    };
+    commit([...elements, el]);
+    setActiveId(el.id); setSelIds([el.id]);
+  };
+  const deselect = () => { setActiveId(null); setSelIds([]); setEditId(null); };
 
   // 두 사각형이 겹치는지
   const overlaps = (a, b) =>
@@ -673,6 +696,7 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
       <div className="dframe-wrap" ref={wrapRef}>
         <div
           className="dframe"
+          onMouseDown={(e) => { if (selected && !e.target.closest(".del")) deselect(); }}
           style={{
             width: frame.w,
             height: frame.h,
@@ -695,6 +719,8 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
                 onEnlarge={(src) => src && setLightboxSrc(src)}
                 onChange={(p) => updateEl(el.id, p)}
                 onMove={(x, y) => moveEl(el.id, x, y)}
+                onDuplicate={() => duplicateEl(el.id)}
+                onDelete={() => { removeEl(el.id); setActiveId(null); setSelIds([]); }}
               />
             ) : (
               <DesignEl key={el.id} el={el} />
@@ -718,6 +744,20 @@ export function DesignFrame({ data, selected, zoom = 1, onChange, photos, decoAs
           }}
           onClose={() => { setActiveId(null); setSelIds([]); }}
         />
+      )}
+      {/* 아무 요소도 선택 안 된 상태 → 꾸미기 그림 갤러리(누르면 새 스티커 추가) */}
+      {selected && !activeEl && Array.isArray(decoAssets) && decoAssets.length > 0 && (
+        <div className="dpanel" onPointerDown={(e) => e.stopPropagation()}>
+          <div className="dpanel-label">꾸미기 그림 추가</div>
+          <div className="dpanel-sublabel">그림을 누르면 캔버스에 추가돼요</div>
+          <div className="dpanel-gallery">
+            {decoAssets.map((g) => (
+              <button key={g.url} className="dpanel-thumb" title={g.label} onClick={() => addDecoEl(g.url)}>
+                <img src={g.url} alt={g.label} draggable={false} />
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       <PhotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
@@ -1208,7 +1248,7 @@ function CutoutImg({ src, fit, style }) {
   );
 }
 
-function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onEnlarge, onChange, onMove }) {
+function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onEndEdit, onEnlarge, onChange, onMove, onDuplicate, onDelete }) {
   const s = el.style || {};
   const fill = { width: "100%", height: "100%", boxSizing: "border-box" };
   const isImage = el.type === "image" || el.type === "photo";
@@ -1276,9 +1316,9 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
         const nw = Math.round(parseFloat(ref.style.width));
         const nh = Math.round(parseFloat(ref.style.height));
         const patch = { w: nw, h: nh, x: Math.round(pos.x), y: Math.round(pos.y) };
-        // 이모지 스티커는 박스와 함께 글자 크기도 스케일(상자만 커지지 않게)
-        if (el.type === "text" && el.sticker && el.h) {
-          const ratio = nh / el.h;
+        // 텍스트 박스를 드래그로 확대/축소하면 글자도 함께 스케일(상자만 커지지 않게)
+        if (el.type === "text" && el.h && el.w) {
+          const ratio = el.sticker ? nh / el.h : (nw / el.w + nh / el.h) / 2;
           const base = s.fontSize || 14;
           patch.style = { ...s, fontSize: Math.max(8, Math.round(base * ratio)) };
         }
@@ -1289,6 +1329,22 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       // 회전은 Rnd 박스 자체에 CSS rotate 로 적용 → 선택 상자(아웃라인)도 함께 기울어짐(피그마식). translate(위치)와 독립 속성이라 충돌 없음.
       style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1, rotate: el.rotation ? `${el.rotation}deg` : undefined }}
     >
+      {active && !editing && (
+        <div
+          className="del-fbar"
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute", left: "50%", bottom: "100%", marginBottom: 8,
+            transform: `translateX(-50%) rotate(${-(el.rotation || 0)}deg) scale(${1 / (scale || 1)})`,
+            transformOrigin: "bottom center",
+          }}
+        >
+          {onDuplicate && <button title="복사" onClick={onDuplicate}><Copy size={13} /></button>}
+          {isImage && <button title="좌우반전" onClick={() => onChange({ flipH: !el.flipH })}><FlipHorizontal size={13} /></button>}
+          <button title="회전 +15°" onClick={() => onChange({ rotation: Math.round((el.rotation || 0) + 15) })}><RotateCw size={13} /></button>
+          {onDelete && <button title="삭제" className="del-fbar-x" onClick={onDelete}><X size={13} /></button>}
+        </div>
+      )}
       <div
         className="del-inner"
         style={{
@@ -1297,6 +1353,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           background: isImage ? s.bg : undefined,
           borderRadius: isImage ? imgRadius : 12,
           boxShadow: isImage ? s.shadow : undefined,
+          transform: el.flipH ? "scaleX(-1)" : undefined,
         }}
         onDoubleClick={
           el.type === "text"
@@ -1324,7 +1381,7 @@ function DesignEl({ el }) {
     top: el.y,
     width: el.w,
     height: el.h,
-    transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+    transform: [el.rotation ? `rotate(${el.rotation}deg)` : "", el.flipH ? "scaleX(-1)" : ""].filter(Boolean).join(" ") || undefined,
   };
   const s = el.style || {};
 

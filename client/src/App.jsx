@@ -525,7 +525,7 @@ function Workspace() {
       const W = 500, H = 707; // A4 비율 캔버스
       const id = nextId();
       setItems((prev) => {
-        const pos = rightOf(prev, W);
+        const pos = findFreeSpot(prev, W, H, item.x + item.w + 40, item.y); // 소스 카드 바로 옆
         return [
           ...prev,
           {

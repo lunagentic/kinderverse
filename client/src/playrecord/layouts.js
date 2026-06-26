@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-26-story-winter-ref";
+export const LAYOUT_VERSION = "2026-06-26-story-bear-squirrel";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -525,23 +525,27 @@ const STORY_STICKER_SPOTS = [
 // 겨울 스토리 기본 디자인 — 레퍼런스('겨울의 즐거움') 구성: 캐릭터·배경(눈송이)·액센트(테이프/장갑)를 균형 배치.
 // 캐릭터는 가장자리(북극곰 좌하·펭귄 우상/우중·다람쥐 우), 눈송이는 작게 흩뿌림, 깅엄 테이프·장갑은 액센트.
 const STORY_WINTER_STICKERS = [
-  // 캐릭터 (큰 마스코트, 네 귀퉁이 균형)
-  { src: "/generated-assets/stk-winter-5.png", x: 4, y: 928, w: 176, h: 176, rot: 4, flip: false },   // 북극곰 (좌하, 大)
-  { src: "/generated-assets/stk-winter-2.png", x: 628, y: 20, w: 150, h: 150, rot: 8, flip: true },    // 펭귄 (우상)
-  { src: "/generated-assets/stk-winter-2.png", x: 668, y: 470, w: 116, h: 116, rot: -7, flip: false }, // 펭귄 (우중)
-  { src: "/generated-assets/stk-winter-3.png", x: 700, y: 626, w: 110, h: 110, rot: 10, flip: false }, // 다람쥐 (우)
-  { src: "/generated-assets/stk-winter-3.png", x: 690, y: 1004, w: 122, h: 122, rot: -10, flip: true },// 다람쥐 (우하)
-  { src: "/generated-assets/stk-winter-1.png", x: 246, y: 50, w: 92, h: 92, rot: -6, flip: false },    // 돋보기 아이 (제목 옆, 小)
-  // 배경: 눈송이 (작게 흩뿌림)
-  { src: "/generated-assets/stk-winter-4.png", x: 226, y: 4, w: 52, h: 52, rot: 6, flip: false },
+  // 디자이너 큐레이션(겨울의 즐거움) — 에셋·좌표·크기·회전·반전 그대로 고정 (20개)
+  { src: "/assets/deco/stk-winter-14.png", x: 10, y: 891, w: 229, h: 229, rot: 4, flip: false },       // 북극곰 (기본 에셋, 좌하 大)
+  { src: "/generated-assets/stk-winter-2.png", x: 636, y: 111, w: 150, h: 150, rot: 8, flip: true },   // 펭귄 (우상)
+  { src: "/assets/deco/stk-winter-9.png", x: 653, y: 455, w: 132, h: 132, rot: -7, flip: false },      // 겨울 소품 (우중)
+  { src: "/generated-assets/stk-winter-3.png", x: 686, y: 984, w: 118, h: 118, rot: -8, flip: true },   // 다람쥐 (우측 하단)
+  { src: "/generated-assets/stk-winter-1.png", x: 235, y: 109, w: 129, h: 129, rot: -6, flip: false }, // 돋보기 아이 (제목 옆)
+  { src: "/generated-assets/stk-winter-4.png", x: 226, y: 4, w: 52, h: 52, rot: 6, flip: false },      // 눈송이
   { src: "/generated-assets/stk-winter-4.png", x: 560, y: 14, w: 46, h: 46, rot: -8, flip: false },
   { src: "/generated-assets/stk-winter-4.png", x: 14, y: 300, w: 44, h: 44, rot: 6, flip: false },
   { src: "/generated-assets/stk-winter-4.png", x: 742, y: 250, w: 42, h: 42, rot: 12, flip: false },
-  { src: "/generated-assets/stk-winter-4.png", x: 392, y: 556, w: 38, h: 38, rot: -6, flip: false },
-  // 액센트: 깅엄 테이프 + 벙어리장갑
-  { src: "/generated-assets/deco-gingham-1.png", x: 404, y: 196, w: 96, h: 96, rot: -10, flip: false },
-  { src: "/generated-assets/deco-gingham-2.png", x: 556, y: 690, w: 96, h: 96, rot: 8, flip: false },
-  { src: "/generated-assets/stk-winter-6.png", x: 330, y: 1004, w: 96, h: 96, rot: 6, flip: false },   // 벙어리장갑 (하단 중앙)
+  { src: "/generated-assets/deco-pin-1.png", x: 442, y: 484, w: 65, h: 65, rot: -6, flip: false },     // 핀 (사진 위)
+  { src: "/generated-assets/deco-gingham-2.png", x: 217, y: 324, w: 96, h: 96, rot: -10, flip: false },// 깅엄 (사진 위)
+  { src: "/generated-assets/deco-gingham-2.png", x: 668, y: 530, w: 96, h: 96, rot: 8, flip: false },  // 깅엄 (사진 위)
+  { src: "/generated-assets/stk-winter-4.png", x: 378, y: 258, w: 96, h: 96, rot: 6, flip: false },    // 눈송이(大)
+  { src: "/assets/deco/stk-winter-10.png", x: -7, y: 817, w: 130, h: 130, rot: 0, flip: false },       // 겨울 나무(눈 가지, 좌하)
+  { src: "/generated-assets/deco-pin-1.png", x: 225, y: 603, w: 69, h: 69, rot: 0, flip: false },      // 핀 (사진 위)
+  { src: "/generated-assets/deco-tape-2.png", x: 73, y: 270, w: 130, h: 130, rot: 0, flip: false },    // 테이프 (사진 위)
+  { src: "/generated-assets/deco-gingham-3.png", x: 516, y: -34, w: 130, h: 130, rot: 0, flip: false },// 깅엄 (상단)
+  { src: "/assets/deco/stk-winter-2.png", x: -18, y: -26, w: 130, h: 130, rot: 0, flip: false },       // 고드름 (좌상단 고정)
+  { src: "/assets/deco/stk-winter-13.png", x: 658, y: 748, w: 130, h: 130, rot: 0, flip: false },      // 겨울 소품 (우중하)
+  { src: "/generated-assets/deco-gingham-1.png", x: 409, y: 729, w: 93, h: 93, rot: 0, flip: false },  // 깅엄 (사진 위)
 ];
 
 export function buildStoryDoc(payload) {
@@ -555,8 +559,10 @@ export function buildStoryDoc(payload) {
   const half = Math.ceil(words.length / 2);
   const line1 = words.slice(0, half).join(" ");
   const line2 = words.length > 1 ? words.slice(half).join(" ") : "";
-  els.push(m.text(51, 40, 360, 138, line1, { fontSize: 101, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
-  if (line2) els.push(m.text(94, 108, 360, 138, line2, { fontSize: 101, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
+  // 제목 박스 확대(440×150) + 두 줄 같은 크기로 자동맞춤(최대 101) → 긴 제목도 카드 밖으로 안 나감
+  const titleFs = Math.min(fitFontSize(line1, 440, 150, 101), line2 ? fitFontSize(line2, 440, 150, 101) : 101);
+  els.push(m.text(51, 40, 440, 150, line1, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
+  if (line2) els.push(m.text(94, 108, 440, 150, line2, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
 
   // 인트로(좌상단)
   if (has(c.intro)) els.push(m.text(37, 234, 331, 98, c.intro, { fontSize: fitFontSize(c.intro, 331, 98, 16), fontFamily: "'Gaegu', cursive", color: "#5b5246", align: "left", valign: "top" }));
@@ -578,25 +584,27 @@ export function buildStoryDoc(payload) {
     if (has(a.summary)) els.push(m.text(cd.x + 16, cd.y + 44, cd.w - 30, cd.h - 54, a.summary, { fontSize: fitFontSize(a.summary, cd.w - 30, cd.h - 54, 12), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
   });
 
-  // 하단 흐름 — 라벨 + 칩 4(활동 제목)
-  els.push(m.shape(187, 924, 90, 26, { bg: "#79b76e", radius: 13 }));
-  els.push(m.text(187, 924, 90, 26, "놀이의 흐름", { fontSize: 13, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }, { textRole: "title" }));
+  // 하단 흐름 — 라벨 + 칩 4(활동 제목). 칩 텍스트는 자동맞춤으로 칩 밖으로 안 나감.
+  const flowY = 906;
+  els.push(m.shape(187, flowY, 90, 26, { bg: "#79b76e", radius: 13 }));
+  els.push(m.text(187, flowY, 90, 26, "놀이의 흐름", { fontSize: 13, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }, { textRole: "title" }));
   STORY_FLOW_CHIPS.forEach((ch, i) => {
     const a = c.activities[i];
     if (!a) return;
-    els.push(m.shape(ch.x, 924, ch.w, 26, { bg: "#f0ead9", radius: 13 }));
-    els.push(m.text(ch.x + 9, 924, ch.w - 14, 26, `${i + 1}. ${a.title || ""}`, { fontSize: 12, fontFamily: LABEL_FONT, color: "#6f6149", align: "left", valign: "center" }));
+    const txt = `${i + 1}. ${a.title || ""}`;
+    els.push(m.shape(ch.x, flowY, ch.w, 26, { bg: "#f0ead9", radius: 13 }));
+    els.push(m.text(ch.x + 9, flowY, ch.w - 14, 26, txt, { fontSize: fitFontSize(txt, ch.w - 14, 26, 12), fontFamily: LABEL_FONT, color: "#6f6149", align: "left", valign: "center" }));
   });
 
-  // 하단 패널 — 놀이 비법(learning) + 교사의 지원(support). 좌/우는 마스코트 자리로 비움.
+  // 하단 패널 — 놀이 비법(learning) + 교사의 지원(support). 둘 다 캔버스 안에(잘림 방지: support 끝 ≤ 1104).
   const panel = (y, h, bg, badge, title, body, bodyH) => {
     els.push(m.shape(181, y, 507, h, { bg, radius: 16, stroke: "#ece3d0", strokeWidth: 1.5 }));
     els.push(m.shape(194, y + 12, 74, 24, { bg: badge, radius: 8 }));
     els.push(m.text(194, y + 12, 74, 24, title, { fontSize: 13, fontFamily: LABEL_FONT, color: "#fff", align: "center", valign: "center" }, { textRole: "title" }));
-    if (has(body)) els.push(m.text(282, y + 12, 392, bodyH, body, { fontSize: fitFontSize(body, 392, bodyH, 13), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
+    if (has(body)) els.push(m.text(282, y + 14, 392, bodyH, body, { fontSize: fitFontSize(body, 392, bodyH, 13), fontFamily: BODY_FONT, color: "#5a5046", align: "left", valign: "top" }));
   };
-  panel(972, 75, th.learnBg, "#f9973f", c.learning.title || "놀이 비법", c.learning.text, 54);
-  panel(1063, 81, th.supportBg, "#418bc8", c.support.title || "교사의 지원", c.support.text, 60);
+  panel(940, 78, th.learnBg, "#f9973f", c.learning.title || "놀이 비법", c.learning.text, 58);
+  panel(1026, 78, th.supportBg, "#418bc8", c.support.title || "교사의 지원", c.support.text, 58);
 
   // 스티커: ① 사용자가 "찜"한 배치(localStorage) ② 겨울 큐레이션 디폴트 ③ 그 외 주제 자동 배치
   const fixed = savedStoryStickers(th.key) || (th.key === "winter" ? STORY_WINTER_STICKERS : null);
@@ -615,7 +623,8 @@ export function buildStoryDoc(payload) {
 }
 
 // ── 스토리 스티커 "찜" 프리셋 (테마별 localStorage) ──
-const STORY_STK_KEY = (themeKey) => `pr-story-stickers-${themeKey || "default"}`;
+// 키에 LAYOUT_VERSION 포함 → 디자인 디폴트가 갱신되면 옛 찜은 자동 무효화(스테일 찜이 새 디폴트를 가리지 않음)
+const STORY_STK_KEY = (themeKey) => `pr-story-stickers-${themeKey || "default"}-${LAYOUT_VERSION}`;
 function savedStoryStickers(themeKey) {
   try {
     const raw = typeof localStorage !== "undefined" && localStorage.getItem(STORY_STK_KEY(themeKey));

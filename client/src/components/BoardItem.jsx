@@ -1271,6 +1271,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
   const fill = { width: "100%", height: "100%", boxSizing: "border-box" };
   const isImage = el.type === "image" || el.type === "photo";
   const draggedRef = useRef(false);
+  const dragStartRef = useRef(null);
   const clickTimer = useRef(null);
 
   // 회전 핸들 드래그 → 상자 중심 기준으로 기울임(피그마식). shift=15° 스냅.
@@ -1353,10 +1354,14 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       enableResizing={active && !editing}
       onMouseDown={onSelect}
       onPointerDown={(e) => e.stopPropagation()}
-      onDragStart={() => { draggedRef.current = false; }}
-      onDrag={() => { draggedRef.current = true; }}
+      onDragStart={(e, d) => { dragStartRef.current = { x: d.x, y: d.y }; draggedRef.current = false; }}
+      onDrag={(e, d) => {
+        // 화면상 3px 이상 움직여야 '드래그'로 인정 → 클릭 시 미세 흔들림(jitter)으로 스티커가 틀어지는 것 방지
+        const st = dragStartRef.current;
+        if (st && (Math.abs(d.x - st.x) * (scale || 1) > 3 || Math.abs(d.y - st.y) * (scale || 1) > 3)) draggedRef.current = true;
+      }}
       onDragStop={(e, d) => {
-        // 클릭(실제 드래그 아님)이면 위치를 갱신하지 않음 → 선택만 했는데 배열이 틀어지는 문제 방지
+        // 실제 드래그(임계값 초과)가 아니면 위치를 갱신하지 않음 → 클릭/선택만 했는데 배열이 틀어지는 문제 방지
         if (!draggedRef.current) return;
         if (onMove) onMove(d.x, d.y);
         else onChange({ x: Math.round(d.x), y: Math.round(d.y) });

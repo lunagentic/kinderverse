@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-26-story-squirrel-down";
+export const LAYOUT_VERSION = "2026-06-26-card-curated2";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -326,17 +326,17 @@ const doc = (title, bg, elements) => ({
 
 // ════════════════════════════ 카드형 ════════════════════════════
 // 활동 수(3~8)에 맞춘 2열 매거진 카드 — 카드마다 사진 + 아이콘 + 제목 + 요약.
-// 카드형 겨울 주제 고정 스티커(레퍼런스 스크린샷 기준). A4 794×1123.
-// 캐릭터: 돋보기아이(1)·펭귄(2)·벙어리장갑(6) / 오브제: 눈송이(gen-4)·솔방울(deco-13)·털모자(deco-4)·가지(deco-9)
+// 카드형 겨울 주제 고정 스티커(사용자 큐레이션 기준). A4 794×1123.
+// 캐릭터: 돋보기아이(1)·펭귄(2 大)·벙어리장갑(6) / 오브제: 눈송이(gen-4 ×2)·솔방울(deco-13 大)·코너 가지(deco-9)
 const CARD_WINTER_STICKERS = [
-  { src: "/assets/deco/stk-winter-9.png", x: -24, y: -18, w: 214, h: 214, rot: 0, flip: false },   // 좌상단 나뭇가지
-  { src: "/assets/deco/stk-winter-9.png", x: 604, y: -18, w: 214, h: 214, rot: 0, flip: true },    // 우상단 나뭇가지(반전)
-  { src: "/generated-assets/stk-winter-4.png", x: 470, y: 58, w: 86, h: 86, rot: -8, flip: false }, // 눈송이(제목 우측)
-  { src: "/generated-assets/stk-winter-6.png", x: 420, y: 212, w: 86, h: 86, rot: 10, flip: false },// 빨간 벙어리장갑(그리드 상단 우)
-  { src: "/generated-assets/stk-winter-1.png", x: 62, y: 348, w: 120, h: 120, rot: -6, flip: false },// 돋보기 아이(좌측 중단)
-  { src: "/generated-assets/stk-winter-2.png", x: 506, y: 444, w: 98, h: 98, rot: 6, flip: true },   // 펭귄(우측 중단)
-  { src: "/assets/deco/stk-winter-13.png", x: 326, y: 636, w: 76, h: 76, rot: -8, flip: false },     // 솔방울(하단 중앙)
-  { src: "/assets/deco/stk-winter-5.png", x: 430, y: 648, w: 96, h: 96, rot: 8, flip: false },       // 청록 털모자(하단 우측)
+  { src: "/assets/deco/stk-winter-9.png", x: 591, y: 27, w: 214, h: 214, rot: 0, flip: false },     // 우상단 코너 나뭇가지
+  { src: "/assets/deco/stk-winter-9.png", x: -18, y: 8, w: 214, h: 214, rot: 0, flip: true },       // 좌상단 코너 나뭇가지(반전)
+  { src: "/generated-assets/stk-winter-4.png", x: 492, y: 6, w: 86, h: 86, rot: -8, flip: false },  // 눈송이(상단 우)
+  { src: "/generated-assets/stk-winter-4.png", x: 140, y: 93, w: 86, h: 86, rot: -8, flip: false }, // 눈송이(상단 좌)
+  { src: "/generated-assets/stk-winter-6.png", x: 685, y: 234, w: 86, h: 86, rot: 10, flip: false },// 빨간 벙어리장갑(우측)
+  { src: "/generated-assets/stk-winter-1.png", x: 567, y: 60, w: 120, h: 120, rot: -6, flip: false },// 돋보기 아이(상단 우, 제목 옆)
+  { src: "/generated-assets/stk-winter-2.png", x: 172, y: 611, w: 164, h: 164, rot: 6, flip: true }, // 펭귄(좌측 중하, 大)
+  { src: "/assets/deco/stk-winter-13.png", x: 655, y: 832, w: 157, h: 157, rot: 8, flip: false },    // 솔방울(우하단, 大)
 ];
 
 export function buildCardDoc(payload) {

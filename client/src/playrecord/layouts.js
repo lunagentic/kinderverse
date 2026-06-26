@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-26-story-bear-squirrel";
+export const LAYOUT_VERSION = "2026-06-26-story-squirrel-down";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -326,6 +326,19 @@ const doc = (title, bg, elements) => ({
 
 // ════════════════════════════ 카드형 ════════════════════════════
 // 활동 수(3~8)에 맞춘 2열 매거진 카드 — 카드마다 사진 + 아이콘 + 제목 + 요약.
+// 카드형 겨울 주제 고정 스티커(레퍼런스 스크린샷 기준). A4 794×1123.
+// 캐릭터: 돋보기아이(1)·펭귄(2)·벙어리장갑(6) / 오브제: 눈송이(gen-4)·솔방울(deco-13)·털모자(deco-4)·가지(deco-9)
+const CARD_WINTER_STICKERS = [
+  { src: "/assets/deco/stk-winter-9.png", x: -24, y: -18, w: 214, h: 214, rot: 0, flip: false },   // 좌상단 나뭇가지
+  { src: "/assets/deco/stk-winter-9.png", x: 604, y: -18, w: 214, h: 214, rot: 0, flip: true },    // 우상단 나뭇가지(반전)
+  { src: "/generated-assets/stk-winter-4.png", x: 470, y: 58, w: 86, h: 86, rot: -8, flip: false }, // 눈송이(제목 우측)
+  { src: "/generated-assets/stk-winter-6.png", x: 420, y: 212, w: 86, h: 86, rot: 10, flip: false },// 빨간 벙어리장갑(그리드 상단 우)
+  { src: "/generated-assets/stk-winter-1.png", x: 62, y: 348, w: 120, h: 120, rot: -6, flip: false },// 돋보기 아이(좌측 중단)
+  { src: "/generated-assets/stk-winter-2.png", x: 506, y: 444, w: 98, h: 98, rot: 6, flip: true },   // 펭귄(우측 중단)
+  { src: "/assets/deco/stk-winter-13.png", x: 326, y: 636, w: 76, h: 76, rot: -8, flip: false },     // 솔방울(하단 중앙)
+  { src: "/assets/deco/stk-winter-5.png", x: 430, y: 648, w: 96, h: 96, rot: 8, flip: false },       // 청록 털모자(하단 우측)
+];
+
 export function buildCardDoc(payload) {
   const c = read(payload);
   const th = themeFor(`${c.meta.theme} ${c.title}`);
@@ -379,7 +392,18 @@ export function buildCardDoc(payload) {
   panel(M, th.learnBg, `♥ ${c.learning.title || "놀이 속 배움"}`, c.learning.text);
   panel(M + pw + gap, th.supportBg, `✓ ${c.support.title || "교사의 지원"}`, c.support.text);
 
-  els.push(...scatterStickers(m, th, 9, c.meta.theme || c.title, occupiedRects(els))); // 강약 섞어 9개
+  // 스티커: 겨울 주제는 레퍼런스 고정 배치, 그 외는 자동 산포(강약 9개)
+  if (th.key === "winter") {
+    CARD_WINTER_STICKERS.forEach((s, i) => {
+      els.push({
+        id: `cstk${i}`, type: "image", src: s.src, fit: "contain", sticker: true,
+        x: s.x, y: s.y, w: s.w, h: s.h, rotation: s.rot ?? 0,
+        flipH: s.flip || undefined, style: { radius: 0 },
+      });
+    });
+  } else {
+    els.push(...scatterStickers(m, th, 9, c.meta.theme || c.title, occupiedRects(els)));
+  }
   return doc(c.title, th.pageBg, els);
 }
 
@@ -528,17 +552,17 @@ const STORY_WINTER_STICKERS = [
   // 디자이너 큐레이션(겨울의 즐거움) — 에셋·좌표·크기·회전·반전 그대로 고정 (20개)
   { src: "/assets/deco/stk-winter-14.png", x: 10, y: 891, w: 229, h: 229, rot: 4, flip: false },       // 북극곰 (기본 에셋, 좌하 大)
   { src: "/generated-assets/stk-winter-2.png", x: 636, y: 111, w: 150, h: 150, rot: 8, flip: true },   // 펭귄 (우상)
-  { src: "/assets/deco/stk-winter-9.png", x: 653, y: 455, w: 132, h: 132, rot: -7, flip: false },      // 겨울 소품 (우중)
-  { src: "/generated-assets/stk-winter-3.png", x: 686, y: 984, w: 118, h: 118, rot: -8, flip: true },   // 다람쥐 (우측 하단)
-  { src: "/generated-assets/stk-winter-1.png", x: 235, y: 109, w: 129, h: 129, rot: -6, flip: false }, // 돋보기 아이 (제목 옆)
+  { src: "/assets/deco/stk-winter-9.png", x: 674, y: 15, w: 132, h: 132, rot: -7, flip: false },        // 코너 나뭇가지 (우상단)
+  { src: "/generated-assets/stk-winter-3.png", x: 645, y: 958, w: 138, h: 138, rot: -8, flip: true },   // 다람쥐 (우측 하단, 북극곰과 균형. 회전 bbox 우측끝≈792<794, 하단≈1105<1123 → 잘림 없음)
+  { src: "/generated-assets/stk-winter-1.png", x: 359, y: 188, w: 129, h: 129, rot: -6, flip: false }, // 돋보기 아이 (최종 고정 위치)
   { src: "/generated-assets/stk-winter-4.png", x: 226, y: 4, w: 52, h: 52, rot: 6, flip: false },      // 눈송이
   { src: "/generated-assets/stk-winter-4.png", x: 560, y: 14, w: 46, h: 46, rot: -8, flip: false },
   { src: "/generated-assets/stk-winter-4.png", x: 14, y: 300, w: 44, h: 44, rot: 6, flip: false },
   { src: "/generated-assets/stk-winter-4.png", x: 742, y: 250, w: 42, h: 42, rot: 12, flip: false },
   { src: "/generated-assets/deco-pin-1.png", x: 442, y: 484, w: 65, h: 65, rot: -6, flip: false },     // 핀 (사진 위)
   { src: "/generated-assets/deco-gingham-2.png", x: 217, y: 324, w: 96, h: 96, rot: -10, flip: false },// 깅엄 (사진 위)
-  { src: "/generated-assets/deco-gingham-2.png", x: 668, y: 530, w: 96, h: 96, rot: 8, flip: false },  // 깅엄 (사진 위)
-  { src: "/generated-assets/stk-winter-4.png", x: 378, y: 258, w: 96, h: 96, rot: 6, flip: false },    // 눈송이(大)
+  { src: "/generated-assets/deco-gingham-2.png", x: 623, y: 237, w: 96, h: 96, rot: 8, flip: false },  // 깅엄 (사진 위, 우상)
+  { src: "/generated-assets/stk-winter-4.png", x: 261, y: 32, w: 96, h: 96, rot: 6, flip: false },     // 눈송이(大, 상단 — 돋보기 아이와 겹침 방지)
   { src: "/assets/deco/stk-winter-10.png", x: -7, y: 817, w: 130, h: 130, rot: 0, flip: false },       // 겨울 나무(눈 가지, 좌하)
   { src: "/generated-assets/deco-pin-1.png", x: 225, y: 603, w: 69, h: 69, rot: 0, flip: false },      // 핀 (사진 위)
   { src: "/generated-assets/deco-tape-2.png", x: 73, y: 270, w: 130, h: 130, rot: 0, flip: false },    // 테이프 (사진 위)
@@ -559,10 +583,10 @@ export function buildStoryDoc(payload) {
   const half = Math.ceil(words.length / 2);
   const line1 = words.slice(0, half).join(" ");
   const line2 = words.length > 1 ? words.slice(half).join(" ") : "";
-  // 제목 박스 확대(440×150) + 두 줄 같은 크기로 자동맞춤(최대 101) → 긴 제목도 카드 밖으로 안 나감
+  // 제목 박스 확대(440×150) + 두 줄 같은 크기로 자동맞춤(최대 101). 줄 간격을 넓혀 두 줄이 서로 겹치지 않게.
   const titleFs = Math.min(fitFontSize(line1, 440, 150, 101), line2 ? fitFontSize(line2, 440, 150, 101) : 101);
-  els.push(m.text(51, 40, 440, 150, line1, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
-  if (line2) els.push(m.text(94, 108, 440, 150, line2, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
+  els.push(m.text(51, 38, 440, 150, line1, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.title, align: "left", valign: "top" }, { textRole: "title" }));
+  if (line2) els.push(m.text(75, 140, 440, 150, line2, { fontSize: titleFs, fontFamily: TITLE_FONT, color: th.accent, align: "left", valign: "top" }, { textRole: "title" }));
 
   // 인트로(좌상단)
   if (has(c.intro)) els.push(m.text(37, 234, 331, 98, c.intro, { fontSize: fitFontSize(c.intro, 331, 98, 16), fontFamily: "'Gaegu', cursive", color: "#5b5246", align: "left", valign: "top" }));

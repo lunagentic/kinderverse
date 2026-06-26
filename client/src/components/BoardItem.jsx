@@ -1380,8 +1380,12 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
       }}
       className={"del" + (active ? " del-active" : "")}
       // 도형은 선택해도 z-순서를 올리지 않음(z=1 유지) → 위에 놓인 사진·텍스트를 가리지 않고 함께 보며 편집(Canva 식)
-      // 회전은 Rnd 박스 자체에 CSS rotate 로 적용 → 선택 상자(아웃라인)도 함께 기울어짐(피그마식). translate(위치)와 독립 속성이라 충돌 없음.
-      style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1, rotate: el.rotation ? `${el.rotation}deg` : undefined }}
+      // ⚠ 회전은 Rnd 박스(`rotate` 속성)가 아니라 아래 .del-inner 의 transform 으로 적용한다.
+      //    react-rnd 는 위치를 `transform: translate()` 로 주는데, CSS 의 `rotate` 속성은 그 translate 의 '바깥'에
+      //    적용돼(스펙상 rotate 후 transform) translate 가 회전된 좌표계에서 일어난다. 그러면 회전 요소가
+      //    선택(EditableEl)/해제(DesignEl) 토글 시 (R−I)·(x,y) 만큼 위치가 튀는 버그가 생긴다.
+      //    회전을 내부 래퍼로 옮기면 박스는 순수 translate(위치)만 → DesignEl(left/top+rotate)과 정확히 일치.
+      style={{ zIndex: active ? (el.type === "shape" ? 1 : 20) : 1 }}
     >
       {active && !editing && (
         <div
@@ -1389,7 +1393,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           onPointerDown={(e) => e.stopPropagation()}
           style={{
             position: "absolute", left: "50%", bottom: "100%", marginBottom: 8,
-            transform: `translateX(-50%) rotate(${-(el.rotation || 0)}deg) scale(${1 / (scale || 1)})`,
+            transform: `translateX(-50%) scale(${1 / (scale || 1)})`,
             transformOrigin: "bottom center",
           }}
         >
@@ -1407,7 +1411,7 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           title="드래그하여 회전 (Shift=15° 단위)"
           style={{
             position: "absolute", left: "50%", top: "100%", marginTop: 10,
-            transform: `translateX(-50%) rotate(${-(el.rotation || 0)}deg) scale(${1 / (scale || 1)})`,
+            transform: `translateX(-50%) scale(${1 / (scale || 1)})`,
             transformOrigin: "top center",
           }}
         >
@@ -1422,7 +1426,8 @@ function EditableEl({ el, scale, active, editing, onSelect, onCycle, onEdit, onE
           background: isImage ? s.bg : undefined,
           borderRadius: isImage ? imgRadius : 12,
           boxShadow: isImage ? s.shadow : undefined,
-          transform: el.flipH ? "scaleX(-1)" : undefined,
+          // 회전+좌우반전을 여기서 적용(박스가 아니라 내용에). DesignEl 과 동일한 순서(rotate→scaleX)·중심 기준.
+          transform: [el.rotation ? `rotate(${el.rotation}deg)` : "", el.flipH ? "scaleX(-1)" : ""].filter(Boolean).join(" ") || undefined,
         }}
         onDoubleClick={
           el.type === "text"

@@ -1596,6 +1596,12 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData, onAddImage
   const pages = docs[variant];
   const page = Math.min(data.page || 0, pages ? pages.length - 1 : 0);
 
+  // 캔버스형 탭을 숨겼으므로, 캔버스형으로 남아있는 카드는 카드형으로 되돌림(갇힘 방지)
+  useEffect(() => {
+    if (variant === "canvas") onUpdateData(item.id, { variant: "card", page: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
+
   // 활성 유형 문서가 없으면 빌드해 저장. 레이아웃 버전이 바뀌면 전체 재생성(최신 디자인 반영).
   useEffect(() => {
     if (data.docsVersion !== LAYOUT_VERSION) {
@@ -1739,7 +1745,8 @@ function PlayRecordEditor({ item, data, selected, zoom, onUpdateData, onAddImage
       {selected && (
         <div className="prdoc-bar" onPointerDown={stop} onMouseDown={stop} onDoubleClick={stop}>
           <div className="prdoc-tabs">
-            {VARIANTS.map((v) => (
+            {/* 캔버스형은 노출하지 않음(작업 보류) — 카드형·스토리형만 탭으로 제공 */}
+            {VARIANTS.filter((v) => v.key !== "canvas").map((v) => (
               <button
                 key={v.key}
                 className={"prdoc-tab" + (v.key === variant ? " on" : "")}

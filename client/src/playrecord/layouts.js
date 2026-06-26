@@ -8,7 +8,7 @@
 export const A4 = { W: 794, H: 1123 };
 
 // 레이아웃 버전 — 올리면 기존에 캐시된 디자인 문서(docs)를 최신 레이아웃으로 재생성한다.
-export const LAYOUT_VERSION = "2026-06-26-card-curated2";
+export const LAYOUT_VERSION = "2026-06-26-card-curated3";
 
 const arr = (v) => (Array.isArray(v) ? v.filter((x) => x != null && x !== "") : []);
 const has = (v) => v != null && v !== "";
@@ -336,7 +336,7 @@ const CARD_WINTER_STICKERS = [
   { src: "/generated-assets/stk-winter-6.png", x: 685, y: 234, w: 86, h: 86, rot: 10, flip: false },// 빨간 벙어리장갑(우측)
   { src: "/generated-assets/stk-winter-1.png", x: 567, y: 60, w: 120, h: 120, rot: -6, flip: false },// 돋보기 아이(상단 우, 제목 옆)
   { src: "/generated-assets/stk-winter-2.png", x: 172, y: 611, w: 164, h: 164, rot: 6, flip: true }, // 펭귄(좌측 중하, 大)
-  { src: "/assets/deco/stk-winter-13.png", x: 655, y: 832, w: 157, h: 157, rot: 8, flip: false },    // 솔방울(우하단, 大)
+  { src: "/assets/deco/stk-winter-13.png", x: 627, y: 832, w: 157, h: 157, rot: 8, flip: false },    // 솔방울(우하단, 大 — 회전 bbox 우측 794 안으로 당김)
 ];
 
 export function buildCardDoc(payload) {
